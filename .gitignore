@@ -26,3 +26,5 @@ out/
 # Rust build artifacts
 target/
 Cargo.lock
+
+.devcontainer/
