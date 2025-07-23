@@ -21,7 +21,10 @@ node_modules/
 out/
 
 # Next.js
-.next/
+frontend/.next/
+
+# reactjs
+frontend/dist/
 
 # Rust build artifacts
 target/
