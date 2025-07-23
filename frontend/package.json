@@ -1,5 +1,5 @@
 {
-  "name": "frontend",
+  "name": "transkripin-frontend",
   "private": true,
   "type": "module",
   "scripts": {
