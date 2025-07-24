@@ -1,5 +1,6 @@
 {
   "name": "transkripin",
+  "description": "Transcribes audio/video into accurate text, summarizes it into clear points, and makes content searchable and shareable with multi-language support for greater accessibility",
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "prebuild": "npm run prebuild --workspaces --if-present",
@@ -8,8 +9,5 @@
   "type": "module",
   "workspaces": [
     "frontend"
-  ],
-  "dependencies": {
-    "tailwindcss": "^4.1.11"
-  }
+  ]
 }
