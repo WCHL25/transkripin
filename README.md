@@ -1,50 +1,56 @@
-# LLM Chatbot
+# Transkripin
 
-The LLM Chatbot example demonstrates how an ICP smart contract can be used to interact with a large language model (LLM) to generate text. The user can input a prompt, and the smart contract will use the LLM to generate a response.
-The response is then returned to the user, and the user can submit some follow-up prompts to continue the conversation.
+**Transkripin** is a decentralized application (dApp) built on the Internet Computer Protocol (ICP) that leverages AI to transcribe and summarize audio/video content into readable, searchable text — all while maintaining data integrity and user privacy on-chain.
 
-## Deploying from ICP Ninja
+---
 
-When viewing this project in ICP Ninja, you can deploy it directly to the mainnet for free by clicking "Run" in the upper right corner. Open this project in ICP Ninja:
+## 🚀 Features
 
-[![](https://icp.ninja/assets/open.svg)](https://icp.ninja/i?g=https://github.com/dfinity/examples/rust/llm_chatbot)
+- 🎧 **AI-Powered Transcription**  
+  Automatically converts audio/video into accurate text.
 
-## Deploying from ICP Ninja
+- 📝 **Smart Summarization**  
+  Summarizes long transcripts into clear, concise bullet points or paragraphs.
 
-[![](https://icp.ninja/assets/open.svg)](https://icp.ninja/editor?g=https://github.com/dfinity/examples/tree/master/rust/counter)
+- 🔍 **Searchable & Sharable**  
+  Makes spoken content easy to navigate, copy, and share.
 
-## Build and deploy from the command-line
+- 🌐 **Multi-language Support**  
+  Understand and summarize content in multiple languages.
 
-### 1. [Download and install the IC SDK.](https://internetcomputer.org/docs/building-apps/getting-started/install)
+- 🛡️ **Built on ICP**  
+  Runs securely and transparently on decentralized canisters.
 
-### 2. Download your project from ICP Ninja using the 'Download files' button on the upper left corner, or [clone the GitHub examples repository.](https://github.com/dfinity/examples/)
+---
 
-### 3. Navigate into the project's directory.
+## ⚙️ Tech Stack
 
-### 4. Set up Ollama
+- **Frontend**: [React.js](https://reactjs.org/)  
+- **Backend (canisters)**: [Rust](https://www.rust-lang.org/) with [DFINITY SDK (DFX)](https://smartcontracts.org/docs/developers-guide/cli-reference/dfx.html)  
+- **Blockchain Platform**: [Internet Computer Protocol (ICP)](https://internetcomputer.org/)  
+- **AI Services**: OpenAI Whisper, ollama
+- **Deployment**: `dfx deploy`, hosted on the IC network
 
-To be able to test the agent locally, you'll need a server for processing the agent's prompts. For that, we'll use `ollama`, which is a tool that can download and serve LLMs.
-See the documentation on the [Ollama website](https://ollama.com/) to install it. Once it's installed, run:
+---
 
-```
-ollama serve
-# Expected to start listening on port 11434
-```
+## 📦 Use Cases
 
-The above command will start the Ollama server, so that it can process requests by the agent. Additionally, and in a separate window, run the following command to download the LLM that will be used by the agent:
+- Students auto-transcribing & summarizing lectures  
+- Teams converting meetings into summaries  
+- Journalists transcribing interviews  
+- Podcast listeners creating digestible notes
 
-```
-ollama run llama3.1:8b
-```
+---
 
-The above command will download an 8B parameter model, which is around 4GiB. Once the command executes and the model is loaded, you can terminate it. You won't need to do this step again.
+## 📄 How to Run Locally
 
-### 5. Deploy the project to your local environment:
+```bash
+# Clone the repo
+git clone https://github.com/WCHL25/transkripin.git
+cd transkripin
 
-```
-dfx start --background --clean && dfx deploy
-```
+# Start the local Internet Computer replica
+dfx start --background
 
-## Security considerations and best practices
-
-If you base your application on this example, it is recommended that you familiarize yourself with and adhere to the [security best practices](https://internetcomputer.org/docs/building-apps/security/overview) for developing on ICP. This example may not implement all the best practices.
+# Deploy the backend canisters
+dfx deploy
