@@ -91,7 +91,7 @@ import App from './App';
 //                     style={{ backgroundImage: `url(${img})`, backgroundSize: 'cover' }}
 //                   ></div>
 //                 )}
-//                 <div className={`max-w-[70%] rounded-lg p-3 ${isUser ? 'bg-blue-500 text-white' : 'bg-white shadow'}`}>
+//                 <div className={`max-w-[70%] rounded-lg p-3 ${isUser ? 'bg-blue-500 text-white' : 'bg-white shadow-sm'}`}>
 //                   <div
 //                     className={`mb-1 flex items-center justify-between text-sm ${isUser ? 'text-white' : 'text-gray-500'}`}
 //                   >
@@ -113,7 +113,7 @@ import App from './App';
 //         <form className="flex rounded-b-lg border-t bg-white p-4" onSubmit={handleSubmit}>
 //           <input
 //             type="text"
-//             className="flex-1 rounded-l border p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+//             className="flex-1 rounded-l border p-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
 //             placeholder="Ask anything ..."
 //             value={inputValue}
 //             onChange={(e) => setInputValue(e.target.value)}
