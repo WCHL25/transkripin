@@ -1,11 +1,24 @@
-import { Box, Button, Snackbar, Typography } from "@mui/material";
+import { 
+  Box, 
+  Button, 
+  Snackbar, 
+  Typography, 
+  LinearProgress,
+  CircularProgress 
+} from "@mui/material";
 import { FaPlus } from "react-icons/fa6";
+import { FaCloudUploadAlt } from "react-icons/fa";
 import Header from "../components/Header";
 import { useEffect, useRef, useState } from "react";
+import { backend } from "declarations/backend";
+import { fileToChunks } from "../utils/fileUtils";
 
 const App = () => {
   const [file, setFile] = useState(null);
   const [snackbar, setSnackbar] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState(''); // 'idle', 'uploading', 'processing', 'complete', 'error'
 
   const inputRef = useRef(null);
 
@@ -18,7 +31,104 @@ const App = () => {
       return false;
     }
 
+    // Check file size (max 100MB)
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    if (file.size > maxSize) {
+      setSnackbar({
+        variant: "error",
+        message: "File size too large. Maximum size is 100MB.",
+      });
+      return false;
+    }
+
     return true;
+  };
+
+  const uploadFile = async (file) => {
+
+    try {
+      setUploading(true);
+      setUploadStatus('uploading');
+      setUploadProgress(0);
+
+      // Convert file to chunks
+      const chunks = await fileToChunks(file);
+      const totalChunks = chunks.length;
+
+      // Start upload session
+      const uploadSession = await backend.start_upload({
+        filename: file.name,
+        content_type: file.type,
+        total_size: BigInt(file.size),
+        total_chunks: BigInt(totalChunks)
+      });
+
+      console.log('uploadSession', uploadSession)
+
+      if (!uploadSession.Ok) {
+        console.log('ini elol')
+        throw new Error(uploadSession.err);
+      }
+
+      const sessionId = uploadSession.Ok;
+
+      // Upload chunks with progress tracking
+      for (let i = 0; i < chunks.length; i++) {
+        const result = await backend.upload_chunk({
+          session_id: sessionId,
+          chunk_index: BigInt(i),
+          data: chunks[i]
+        });
+
+        console.log('result', result)
+
+        if (!result.Ok) {
+          throw new Error(result.err);
+        }
+
+        // Update progress
+        const progress = ((i + 1) / totalChunks) * 70; // 70% for upload
+        setUploadProgress(progress);
+      }
+
+      // Complete upload
+      setUploadStatus('processing');
+      setUploadProgress(80);
+
+      const completeResult = await backend.complete_upload(sessionId);
+
+      console.log('completeResult', completeResult)
+      
+      if (!completeResult.Ok) {
+        throw new Error(completeResult.err);
+      }
+
+      setUploadProgress(100);
+      setUploadStatus('complete');
+
+      setSnackbar({
+        variant: "success",
+        message: "File uploaded successfully!",
+      });
+
+      // You can handle the response here (e.g., file ID, transcription result, etc.)
+      console.log("Upload completed:", completeResult.ok);
+
+    } catch (error) {
+      console.error("Upload error:", error);
+      setUploadStatus('error');
+      setSnackbar({
+        variant: "error",
+        message: `Upload failed: ${error.message}`,
+      });
+    } finally {
+      setUploading(false);
+      // Reset progress after a delay
+      setTimeout(() => {
+        setUploadProgress(0);
+        setUploadStatus('idle');
+      }, 3000);
+    }
   };
 
   const handleDrop = (e) => {
@@ -34,6 +144,7 @@ const App = () => {
   };
 
   const handleClick = () => {
+    if (uploading) return;
     inputRef.current?.click();
   };
 
@@ -44,6 +155,27 @@ const App = () => {
       setFile(selectedFile);
     } else if (!selectedFile) {
       setFile(null);
+    }
+  };
+
+  const handleUpload = () => {
+    if (file && !uploading) {
+      uploadFile(file);
+    }
+  };
+
+  const getStatusMessage = () => {
+    switch (uploadStatus) {
+      case 'uploading':
+        return 'Uploading file...';
+      case 'processing':
+        return 'Processing file...';
+      case 'complete':
+        return 'Upload completed!';
+      case 'error':
+        return 'Upload failed';
+      default:
+        return '';
     }
   };
 
@@ -83,26 +215,95 @@ const App = () => {
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
           >
-            <Button
-              variant="contained"
-              className="w-full h-full !rounded-[24px] !grid place-items-center"
-              onClick={handleClick}
-            >
-              <Box>
-                <input
-                  ref={inputRef}
-                  type="file"
-                  hidden
-                  onChange={handleChange}
-                />
-                <Box className="rounded-full p-5 bg-white mb-5 w-fit mx-auto">
-                  <FaPlus className="text-4xl text-black" />
+            {!file ? (
+              <Button
+                variant="contained"
+                className="w-full h-full !rounded-[24px] !grid place-items-center"
+                onClick={handleClick}
+                disabled={uploading}
+              >
+                <Box>
+                  <input
+                    ref={inputRef}
+                    type="file"
+                    hidden
+                    onChange={handleChange}
+                    accept="video/*,audio/*"
+                  />
+                  <Box className="rounded-full p-5 bg-white mb-5 w-fit mx-auto">
+                    <FaPlus className="text-4xl text-black" />
+                  </Box>
+                  <Typography variant="body1">
+                    Upload or drag & drop video or audio
+                  </Typography>
                 </Box>
-                <Typography variant="body1">
-                  Upload or drag & drop video or audio
-                </Typography>
+              </Button>
+            ) : (
+              <Box className="h-full flex flex-col justify-center items-center space-y-4">
+                {/* File Info */}
+                <Box className="text-center">
+                  <Typography variant="h6" className="mb-2">
+                    {file.name}
+                  </Typography>
+                  <Typography variant="body2" className="text-gray-600">
+                    Size: {(file.size / (1024 * 1024)).toFixed(2)} MB
+                  </Typography>
+                  <Typography variant="body2" className="text-gray-600">
+                    Type: {file.type}
+                  </Typography>
+                </Box>
+
+                {/* Upload Progress */}
+                {uploading && (
+                  <Box className="w-full max-w-md">
+                    <Box className="flex items-center justify-center mb-2">
+                      <CircularProgress size={20} className="mr-2" />
+                      <Typography variant="body2">
+                        {getStatusMessage()}
+                      </Typography>
+                    </Box>
+                    <LinearProgress 
+                      variant="determinate" 
+                      value={uploadProgress} 
+                      className="w-full"
+                    />
+                    <Typography variant="caption" className="block text-center mt-1">
+                      {Math.round(uploadProgress)}%
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* Action Buttons */}
+                <Box className="flex space-x-4">
+                  <Button
+                    variant="contained"
+                    onClick={handleUpload}
+                    disabled={uploading}
+                    startIcon={
+                      uploading ? (
+                        <CircularProgress size={16} />
+                      ) : (
+                        <FaCloudUploadAlt />
+                      )
+                    }
+                  >
+                    {uploading ? 'Uploading...' : 'Upload File'}
+                  </Button>
+                  
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      setFile(null);
+                      setUploadProgress(0);
+                      setUploadStatus('idle');
+                    }}
+                    disabled={uploading}
+                  >
+                    Remove
+                  </Button>
+                </Box>
               </Box>
-            </Button>
+            )}
           </Box>
         </Box>
       </Box>

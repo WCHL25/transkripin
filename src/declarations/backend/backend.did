@@ -1,14 +1,33 @@
-type AssistantMessage = record {
-  content : opt text;
-  tool_calls : vec ToolCall;
+type Result = variant { Ok : text; Err : text };
+type Result_1 = variant { Ok : UploadedFile; Err : text };
+type Result_2 = variant { Ok : record { nat64; nat64 }; Err : text };
+type StartUploadRequest = record {
+  total_chunks : nat64;
+  content_type : text;
+  total_size : nat64;
+  filename : text;
 };
-type ChatMessage = variant {
-  tool : record { content : text; tool_call_id : text };
-  user : record { content : text };
-  assistant : AssistantMessage;
-  system : record { content : text };
+type UploadChunkRequest = record {
+  chunk_index : nat64;
+  session_id : text;
+  data : blob;
 };
-type FunctionCall = record { name : text; arguments : vec ToolCallArgument };
-type ToolCall = record { id : text; function : FunctionCall };
-type ToolCallArgument = record { value : text; name : text };
-service : { chat : (vec ChatMessage) -> (text); prompt : (text) -> (text) }
+type UploadedFile = record {
+  id : text;
+  owner : principal;
+  data : blob;
+  size : nat64;
+  content_type : text;
+  filename : text;
+  uploaded_at : nat64;
+};
+service : {
+  cleanup_old_sessions : () -> (text);
+  complete_upload : (text) -> (Result);
+  delete_file : (text) -> (Result);
+  get_file : (text) -> (Result_1) query;
+  get_upload_status : (text) -> (Result_2) query;
+  list_files : () -> (vec record { text; text; text; nat64 }) query;
+  start_upload : (StartUploadRequest) -> (Result);
+  upload_chunk : (UploadChunkRequest) -> (Result);
+}
