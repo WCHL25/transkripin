@@ -1,16 +1,16 @@
-import { 
-  Box, 
-  Button, 
-  Snackbar, 
-  Typography, 
+import {
+  Box,
+  Button,
+  Snackbar,
+  Typography,
   LinearProgress,
-  CircularProgress 
+  CircularProgress,
 } from "@mui/material";
 import { FaPlus } from "react-icons/fa6";
 import { FaCloudUploadAlt } from "react-icons/fa";
 import Header from "../components/Header";
 import { useEffect, useRef, useState } from "react";
-import { backend } from "declarations/backend";
+import { summarize } from "declarations/summarize";
 import { fileToChunks } from "../utils/fileUtils";
 
 const App = () => {
@@ -18,7 +18,7 @@ const App = () => {
   const [snackbar, setSnackbar] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadStatus, setUploadStatus] = useState(''); // 'idle', 'uploading', 'processing', 'complete', 'error'
+  const [uploadStatus, setUploadStatus] = useState(""); // 'idle', 'uploading', 'processing', 'complete', 'error'
 
   const inputRef = useRef(null);
 
@@ -45,10 +45,9 @@ const App = () => {
   };
 
   const uploadFile = async (file) => {
-
     try {
       setUploading(true);
-      setUploadStatus('uploading');
+      setUploadStatus("uploading");
       setUploadProgress(0);
 
       // Convert file to chunks
@@ -56,17 +55,17 @@ const App = () => {
       const totalChunks = chunks.length;
 
       // Start upload session
-      const uploadSession = await backend.start_upload({
+      const uploadSession = await summarize.start_upload({
         filename: file.name,
         content_type: file.type,
         total_size: BigInt(file.size),
-        total_chunks: BigInt(totalChunks)
+        total_chunks: BigInt(totalChunks),
       });
 
-      console.log('uploadSession', uploadSession)
+      console.log("uploadSession", uploadSession);
 
       if (!uploadSession.Ok) {
-        console.log('ini elol')
+        console.log("ini elol");
         throw new Error(uploadSession.err);
       }
 
@@ -74,13 +73,13 @@ const App = () => {
 
       // Upload chunks with progress tracking
       for (let i = 0; i < chunks.length; i++) {
-        const result = await backend.upload_chunk({
+        const result = await summarize.upload_chunk({
           session_id: sessionId,
           chunk_index: BigInt(i),
-          data: chunks[i]
+          data: chunks[i],
         });
 
-        console.log('result', result)
+        console.log("result", result);
 
         if (!result.Ok) {
           throw new Error(result.err);
@@ -92,19 +91,19 @@ const App = () => {
       }
 
       // Complete upload
-      setUploadStatus('processing');
+      setUploadStatus("processing");
       setUploadProgress(80);
 
-      const completeResult = await backend.complete_upload(sessionId);
+      const completeResult = await summarize.complete_upload(sessionId);
 
-      console.log('completeResult', completeResult)
-      
+      console.log("completeResult", completeResult);
+
       if (!completeResult.Ok) {
         throw new Error(completeResult.err);
       }
 
       setUploadProgress(100);
-      setUploadStatus('complete');
+      setUploadStatus("complete");
 
       setSnackbar({
         variant: "success",
@@ -113,10 +112,9 @@ const App = () => {
 
       // You can handle the response here (e.g., file ID, transcription result, etc.)
       console.log("Upload completed:", completeResult.ok);
-
     } catch (error) {
       console.error("Upload error:", error);
-      setUploadStatus('error');
+      setUploadStatus("error");
       setSnackbar({
         variant: "error",
         message: `Upload failed: ${error.message}`,
@@ -126,7 +124,7 @@ const App = () => {
       // Reset progress after a delay
       setTimeout(() => {
         setUploadProgress(0);
-        setUploadStatus('idle');
+        setUploadStatus("idle");
       }, 3000);
     }
   };
@@ -166,16 +164,16 @@ const App = () => {
 
   const getStatusMessage = () => {
     switch (uploadStatus) {
-      case 'uploading':
-        return 'Uploading file...';
-      case 'processing':
-        return 'Processing file...';
-      case 'complete':
-        return 'Upload completed!';
-      case 'error':
-        return 'Upload failed';
+      case "uploading":
+        return "Uploading file...";
+      case "processing":
+        return "Processing file...";
+      case "complete":
+        return "Upload completed!";
+      case "error":
+        return "Upload failed";
       default:
-        return '';
+        return "";
     }
   };
 
@@ -262,12 +260,15 @@ const App = () => {
                         {getStatusMessage()}
                       </Typography>
                     </Box>
-                    <LinearProgress 
-                      variant="determinate" 
-                      value={uploadProgress} 
+                    <LinearProgress
+                      variant="determinate"
+                      value={uploadProgress}
                       className="w-full"
                     />
-                    <Typography variant="caption" className="block text-center mt-1">
+                    <Typography
+                      variant="caption"
+                      className="block text-center mt-1"
+                    >
                       {Math.round(uploadProgress)}%
                     </Typography>
                   </Box>
@@ -287,15 +288,15 @@ const App = () => {
                       )
                     }
                   >
-                    {uploading ? 'Uploading...' : 'Upload File'}
+                    {uploading ? "Uploading..." : "Upload File"}
                   </Button>
-                  
+
                   <Button
                     variant="outlined"
                     onClick={() => {
                       setFile(null);
                       setUploadProgress(0);
-                      setUploadStatus('idle');
+                      setUploadStatus("idle");
                     }}
                     disabled={uploading}
                   >
