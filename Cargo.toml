@@ -1,3 +1,6 @@
 [workspace]
-members = ["backend"]
+members = [
+    "backend/summarize",
+    "backend/transcribe"
+]
 resolver = "2"
