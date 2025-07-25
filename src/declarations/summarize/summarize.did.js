@@ -1,23 +1,4 @@
 export const idlFactory = ({ IDL }) => {
-  const ToolCallArgument = IDL.Record({
-    'value' : IDL.Text,
-    'name' : IDL.Text,
-  });
-  const FunctionCall = IDL.Record({
-    'name' : IDL.Text,
-    'arguments' : IDL.Vec(ToolCallArgument),
-  });
-  const ToolCall = IDL.Record({ 'id' : IDL.Text, 'function' : FunctionCall });
-  const AssistantMessage = IDL.Record({
-    'content' : IDL.Opt(IDL.Text),
-    'tool_calls' : IDL.Vec(ToolCall),
-  });
-  const ChatMessage = IDL.Variant({
-    'tool' : IDL.Record({ 'content' : IDL.Text, 'tool_call_id' : IDL.Text }),
-    'user' : IDL.Record({ 'content' : IDL.Text }),
-    'assistant' : AssistantMessage,
-    'system' : IDL.Record({ 'content' : IDL.Text }),
-  });
   const Result = IDL.Variant({ 'Ok' : IDL.Text, 'Err' : IDL.Text });
   const UploadedFile = IDL.Record({
     'id' : IDL.Text,
@@ -45,7 +26,6 @@ export const idlFactory = ({ IDL }) => {
     'data' : IDL.Vec(IDL.Nat8),
   });
   return IDL.Service({
-    'chat' : IDL.Func([IDL.Vec(ChatMessage)], [IDL.Text], []),
     'complete_upload' : IDL.Func([IDL.Text], [Result], []),
     'delete_file' : IDL.Func([IDL.Text], [Result], []),
     'get_file' : IDL.Func([IDL.Text], [Result_1], ['query']),
@@ -55,7 +35,6 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text, IDL.Text, IDL.Nat64))],
         ['query'],
       ),
-    'prompt' : IDL.Func([IDL.Text], [IDL.Text], []),
     'start_upload' : IDL.Func([StartUploadRequest], [Result], []),
     'upload_chunk' : IDL.Func([UploadChunkRequest], [Result], []),
   });
