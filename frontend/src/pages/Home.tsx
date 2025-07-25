@@ -10,7 +10,7 @@ import { FaPlus } from "react-icons/fa6";
 import { FaCloudUploadAlt } from "react-icons/fa";
 import Header from "../components/Header";
 import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
-import { backend } from "declarations/backend";
+import { summarize } from "declarations/summarize";
 import { fileToChunks } from "@/utils/fileUtils";
 import Result from "@/components/Result";
 
@@ -62,7 +62,7 @@ const Home = () => {
       const totalChunks = chunks.length;
 
       // Start upload session
-      const uploadSession = await backend.start_upload({
+      const uploadSession = await summarize.start_upload({
         filename: file.name,
         content_type: file.type,
         total_size: BigInt(file.size),
@@ -79,7 +79,7 @@ const Home = () => {
 
       // Upload chunks with progress tracking
       for (let i = 0; i < chunks.length; i++) {
-        const result = await backend.upload_chunk({
+        const result = await summarize.upload_chunk({
           session_id: sessionId,
           chunk_index: BigInt(i),
           data: chunks[i],
@@ -100,7 +100,7 @@ const Home = () => {
       setUploadStatus("processing");
       setUploadProgress(80);
 
-      const completeResult = await backend.complete_upload(sessionId);
+      const completeResult = await summarize.complete_upload(sessionId);
 
       console.log("completeResult", completeResult);
 

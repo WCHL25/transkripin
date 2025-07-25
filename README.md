@@ -25,9 +25,9 @@
 
 ## ⚙️ Tech Stack
 
-- **Frontend**: [React.js](https://reactjs.org/)  
-- **Backend (canisters)**: [Rust](https://www.rust-lang.org/) with [DFINITY SDK (DFX)](https://smartcontracts.org/docs/developers-guide/cli-reference/dfx.html)  
-- **Blockchain Platform**: [Internet Computer Protocol (ICP)](https://internetcomputer.org/)  
+- **Frontend**: [React.js](https://reactjs.org/)
+- **Backend (canisters)**: [Rust](https://www.rust-lang.org/) with [DFINITY SDK (DFX)](https://smartcontracts.org/docs/developers-guide/cli-reference/dfx.html)
+- **Blockchain Platform**: [Internet Computer Protocol (ICP)](https://internetcomputer.org/)
 - **AI Services**: OpenAI Whisper, ollama
 - **Deployment**: `dfx deploy`, hosted on the IC network
 
@@ -35,10 +35,40 @@
 
 ## 📦 Use Cases
 
-- Students auto-transcribing & summarizing lectures  
-- Teams converting meetings into summaries  
-- Journalists transcribing interviews  
+- Students auto-transcribing & summarizing lectures
+- Teams converting meetings into summaries
+- Journalists transcribing interviews
 - Podcast listeners creating digestible notes
+
+---
+
+## 🔧 Tools Integration
+
+Transkripin uses [FFmpeg](https://ffmpeg.org/) to handle media processing, such as converting uploaded files into audio formats.
+
+### Install FFmpeg
+
+```bash
+sudo apt update
+sudo apt install ffmpeg -y
+```
+
+### Install Whisper
+
+Transkripin contains AI models required for transcription and summarization.
+
+The model is required for transcription using Whisper.  
+You can download it directly from Hugging Face.
+
+### Steps:
+
+```bash
+# Navigate to the models directory
+cd backend/assets/models
+
+# Download the model
+wget https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
+```
 
 ---
 
@@ -49,8 +79,12 @@
 git clone https://github.com/WCHL25/transkripin.git
 cd transkripin
 
+# Start the Transcribe AI
+cargo run -p transcribe
+
 # Start the local Internet Computer replica
-dfx start --background
+dfx start --clean --background
 
 # Deploy the backend canisters
 dfx deploy
+```

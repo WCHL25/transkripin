@@ -31,3 +31,6 @@ target/
 Cargo.lock
 
 .devcontainer/
+
+
+ggml-base.en.bin
