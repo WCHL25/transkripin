@@ -8,11 +8,11 @@ import {
 } from "@mui/material";
 import { FaPlus } from "react-icons/fa6";
 import { FaCloudUploadAlt } from "react-icons/fa";
-import Header from "../components/Header";
+import Header from "../../components/Header";
 import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
 import { summarize } from "declarations/summarize";
 import { fileToChunks } from "@/utils/fileUtils";
-import Result from "@/components/Result";
+import Result from "@/pages/Home/components/Result";
 
 interface SnackbarState {
   variant: "success" | "error";
@@ -23,14 +23,24 @@ const Home = () => {
   const [file, setFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState("");
   const [snackbar, setSnackbar] = useState<SnackbarState | null>(null);
+  const [result, setResult] = useState<string>('')
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState(""); // 'idle', 'uploading', 'processing', 'complete', 'error'
 
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  const removeFile = () => {
+    setFile(null)
+    const dt = new DataTransfer()
+    if (inputRef.current) {
+         inputRef.current.files = dt.files;
+      }
+  }
+
   const validateFile = (file: File) => {
     if (!file.type.startsWith("video") && !file.type.startsWith("audio")) {
+      removeFile()
       setSnackbar({
         variant: "error",
         message: "File type not valid. Must be a video or audio.",
@@ -41,6 +51,7 @@ const Home = () => {
     // Check file size (max 100MB)
     const maxSize = 100 * 1024 * 1024; // 100MB
     if (file.size > maxSize) {
+      removeFile()
       setSnackbar({
         variant: "error",
         message: "File size too large. Maximum size is 100MB.",
@@ -110,6 +121,7 @@ const Home = () => {
 
       setUploadProgress(100);
       setUploadStatus("complete");
+      setResult(completeResult.Ok)
 
       setSnackbar({
         variant: "success",
@@ -118,6 +130,7 @@ const Home = () => {
 
       // You can handle the response here (e.g., file ID, transcription result, etc.)
       console.log("Upload completed:", completeResult.Ok);
+      console.log()
 
       setVideoUrl(URL.createObjectURL(file));
 
@@ -202,7 +215,7 @@ const Home = () => {
 
       <Header />
 
-      <Box component="main" className="container mx-auto px-5 pb-10">
+      <Box component="main" className="container mx-auto px-5 pb-10 relative overflow-hidden">
         <Box className="bg-background2 blur-[70px] absolute -top-20 rounded-full w-[1200px] h-96 left-1/2 -translate-x-1/2 -z-10"></Box>
 
         <Box className="min-h-dvh grid place-items-center py-20 text-center">
@@ -240,7 +253,7 @@ const Home = () => {
                       type="file"
                       hidden
                       onChange={handleChange}
-                      accept="video/*,audio/*"
+                      accept="video/*, audio/*"
                     />
                     <Box className="rounded-full p-5 bg-white mb-5 w-fit mx-auto">
                       <FaPlus className="text-4xl text-black" />
@@ -324,7 +337,7 @@ const Home = () => {
         </Box>
 
         {uploadStatus === "complete" && videoUrl && (
-          <Result videoUrl={videoUrl} />
+          <Result videoUrl={videoUrl} type={file?.type || ''} summary={result} />
         )}
       </Box>
     </>

@@ -2,6 +2,7 @@ import { Suspense, useMemo } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Route as RouteType, routes } from "@/configs/routes";
 import NotFound from "@/pages/NotFound";
+import Loading from "./components/Loading";
 
 function App() {
    const renderRoutes = (routes: RouteType[]) => {
@@ -28,7 +29,7 @@ function App() {
 
    return (
       <BrowserRouter>
-         <Suspense fallback={<>Loading...</>}>
+         <Suspense fallback={<Loading />}>
             <Routes>
                {renderedRoutes}
 
