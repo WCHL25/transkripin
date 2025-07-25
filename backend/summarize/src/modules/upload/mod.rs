@@ -15,6 +15,8 @@ use ic_cdk::{
     query,
 };
 
+use crate::modules::llm::summarize_transcription;
+
 #[derive(CandidType, Deserialize, Clone)]
 pub struct UploadSession {
     pub id: String,
@@ -187,10 +189,15 @@ pub async fn complete_upload(session_id: String) -> Result<String, String> {
         files.borrow_mut().insert(file_id.clone(), uploaded_file);
     });
 
-    // Process the file (async)
-    let transcription = process_uploaded_file(&file_id).await?;
+    // Get transcription (dummy text or actual decoding from file)
+    let transcription = process_uploaded_file(&file_id).await.map_err(|e|
+        format!("Transcription failed: {}", e)
+    )?;
 
-    Ok(transcription)
+    // Summarize transcription using ic_llm
+    let summary = summarize_transcription(transcription).await;
+
+    Ok(summary)
 }
 
 #[query]
