@@ -1,14 +1,14 @@
 {
   "canisters": {
-    "summarize": {
-      "candid": "backend/summarize/summarize.did",
+    "backend": {
+      "candid": "backend/backend.did",
       "type": "custom",
       "shrink": true,
       "gzip": true,
-      "wasm": "target/wasm32-unknown-unknown/release/summarize.wasm",
+      "wasm": "target/wasm32-unknown-unknown/release/backend.wasm",
       "build": [
-        "cargo build --target wasm32-unknown-unknown --release -p summarize",
-        "candid-extractor target/wasm32-unknown-unknown/release/summarize.wasm > backend/summarize/summarize.did"
+        "cargo build --target wasm32-unknown-unknown --release -p backend",
+        "candid-extractor target/wasm32-unknown-unknown/release/backend.wasm > backend/backend.did"
       ],
       "metadata": [
         {
@@ -17,7 +17,7 @@
       ]
     },
     "frontend": {
-      "dependencies": ["summarize"],
+      "dependencies": ["backend"],
       "frontend": {
         "entrypoint": "frontend/index.html"
       },
