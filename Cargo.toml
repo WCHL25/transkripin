@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "backend",
-    "transcribe"
+    "src/backend",
+    "src/transcribe"
 ]
 resolver = "2"
