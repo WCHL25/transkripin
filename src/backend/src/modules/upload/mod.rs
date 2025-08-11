@@ -196,6 +196,7 @@ pub async fn complete_upload(session_id: String) -> Result<String, String> {
 
     // Summarize transcription using ic_llm
     let summary = summarize_transcription(transcription).await;
+    ic_cdk::println!("Summary: {}", summary);
 
     Ok(summary)
 }
@@ -298,51 +299,102 @@ async fn process_uploaded_file(file_id: &str) -> Result<String, String> {
 }
 
 async fn call_transcription_service(file: UploadedFile) -> Result<String, String> {
-    let url = "http://localhost:3000/transcribe";
-
-    // Define boundary
+    let base_url = "http://localhost:3000/transcribe";
     let boundary = "----ic_boundary";
+    let chunk_size = 1_900_000; // ~1.9 MB
+    let session_id = file.id.clone();
 
-    // Build multipart body
-    let mut body = Vec::new();
-    body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
-    body.extend_from_slice(
-        format!(
-            "Content-Disposition: form-data; name=\"file\"; filename=\"{}\"\r\n",
-            file.filename
-        ).as_bytes()
-    );
-    body.extend_from_slice(format!("Content-Type: {}\r\n\r\n", file.content_type).as_bytes());
-    body.extend_from_slice(&file.data);
-    body.extend_from_slice(b"\r\n");
-    body.extend_from_slice(format!("--{}--\r\n", boundary).as_bytes());
+    let mut offset = 0;
+    let mut chunk_index = 0;
 
-    // Calculate cycles
-    let request_size = body.len() as u64;
+    while offset < file.data.len() {
+        let end = usize::min(offset + chunk_size, file.data.len());
+        let chunk = &file.data[offset..end];
+
+        // Build multipart body for chunk
+        let mut body = Vec::new();
+
+        // Session ID
+        body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+        body.extend_from_slice(b"Content-Disposition: form-data; name=\"session_id\"\r\n\r\n");
+        body.extend_from_slice(session_id.as_bytes());
+        body.extend_from_slice(b"\r\n");
+
+        // Chunk index
+        body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+        body.extend_from_slice(b"Content-Disposition: form-data; name=\"chunk_index\"\r\n\r\n");
+        body.extend_from_slice(chunk_index.to_string().as_bytes());
+        body.extend_from_slice(b"\r\n");
+
+        // Chunk data
+        body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+        body.extend_from_slice(
+            format!(
+                "Content-Disposition: form-data; name=\"file\"; filename=\"{}\"\r\n",
+                file.filename
+            ).as_bytes()
+        );
+        body.extend_from_slice(format!("Content-Type: {}\r\n\r\n", file.content_type).as_bytes());
+        body.extend_from_slice(chunk);
+        body.extend_from_slice(b"\r\n");
+        body.extend_from_slice(format!("--{}--\r\n", boundary).as_bytes());
+
+        // Calculate cycles
+        let request_size = body.len() as u64;
+        let response_size = 2_000_000u64;
+        let cycles = 400_000_000 + (request_size + response_size) * 600_000;
+        ic_cdk::println!(
+            "Estimated cycles for HTTP request: {} (request_size: {} bytes)",
+            cycles,
+            request_size
+        );
+
+        // Construct request
+        let request = CanisterHttpRequestArgument {
+            url: format!("{}/upload_chunk", base_url),
+            method: HttpMethod::POST,
+            headers: vec![HttpHeader {
+                name: "Content-Type".to_string(),
+                value: format!("multipart/form-data; boundary={}", boundary),
+            }],
+            body: Some(body),
+            max_response_bytes: Some(response_size),
+            transform: None,
+        };
+
+        http_request(request, cycles.into()).await.map_err(|e|
+            format!("Chunk {} upload failed: {:?}", chunk_index, e)
+        )?;
+
+        offset = end;
+        chunk_index += 1;
+    }
+
+    // Tell server we're done uploading
+    let finalize_body = serde_json
+        ::to_vec(&serde_json::json!({
+        "session_id": session_id
+    }))
+        .unwrap();
+
+    let request_size = finalize_body.len() as u64;
     let response_size = 2_000_000u64;
     let cycles = 400_000_000 + (request_size + response_size) * 600_000;
-    ic_cdk::println!(
-        "Estimated cycles for HTTP request: {} (request_size: {} bytes)",
-        cycles,
-        request_size
-    );
 
-    // Construct request
-    let request = CanisterHttpRequestArgument {
-        url: url.to_string(),
+    let finalize_request = CanisterHttpRequestArgument {
+        url: format!("{}/finalize_upload", base_url),
         method: HttpMethod::POST,
         headers: vec![HttpHeader {
             name: "Content-Type".to_string(),
-            value: format!("multipart/form-data; boundary={}", boundary),
+            value: "application/json".to_string(),
         }],
-        body: Some(body),
-        max_response_bytes: Some(response_size),
+        body: Some(finalize_body),
+        max_response_bytes: Some(2_000_000u64),
         transform: None,
     };
 
-    // Perform HTTP outcall
-    let (response,): (HttpResponse,) = http_request(request, cycles.into()).await.map_err(|e|
-        format!("HTTP request failed: {:?}", e)
+    let (response,): (HttpResponse,) = http_request(finalize_request, cycles.into()).await.map_err(
+        |e| format!("Finalize request failed: {:?}", e)
     )?;
 
     let result = String::from_utf8(response.body).map_err(|_|
