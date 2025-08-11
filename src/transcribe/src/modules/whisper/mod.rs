@@ -43,7 +43,7 @@ pub async fn whisper_transcribe(video_data: Vec<u8>) -> Result<String> {
 
     let pcm = extract_chunks(&audio_wav);
 
-    let path_to_model = "backend/assets/models/ggml-base.en.bin";
+    let path_to_model = "src/transcribe/assets/models/ggml-base.en.bin";
     let ctx = WhisperContext::new_with_params(
         path_to_model,
         WhisperContextParameters::default()
