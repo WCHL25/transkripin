@@ -1,4 +1,3 @@
-use candid::{ CandidType, Deserialize, Principal };
 use std::{ collections::HashMap, cell::RefCell };
 use ic_cdk::{
     api::{
@@ -6,68 +5,26 @@ use ic_cdk::{
         management_canister::http_request::{
             http_request,
             CanisterHttpRequestArgument,
-            HttpHeader,
             HttpMethod,
             HttpResponse,
         },
     },
-    update,
     query,
+    update,
 };
 
-use crate::modules::llm::summarize_transcription;
+pub mod domain;
 
-#[derive(CandidType, Deserialize, Clone)]
-pub struct UploadSession {
-    pub id: String,
-    pub filename: String,
-    pub content_type: String,
-    pub total_size: u64,
-    pub total_chunks: u64,
-    pub uploaded_chunks: Vec<Vec<u8>>,
-    pub owner: Principal,
-    pub created_at: u64,
-}
+pub use domain::*;
 
-#[derive(CandidType, Deserialize)]
-pub struct StartUploadRequest {
-    pub filename: String,
-    pub content_type: String,
-    pub total_size: u64,
-    pub total_chunks: u64,
-}
-
-#[derive(CandidType, Deserialize)]
-pub struct UploadChunkRequest {
-    pub session_id: String,
-    pub chunk_index: u64,
-    pub data: Vec<u8>,
-}
-
-#[derive(CandidType, Deserialize, Clone)]
-pub struct UploadedFile {
-    pub id: String,
-    pub filename: String,
-    pub content_type: String,
-    pub size: u64,
-    pub data: Vec<u8>,
-    pub owner: Principal,
-    pub uploaded_at: u64,
-}
-
-type UploadSessions = HashMap<String, UploadSession>;
-type UploadedFiles = HashMap<String, UploadedFile>;
+use crate::common::*;
 
 thread_local! {
     static UPLOAD_SESSIONS: RefCell<UploadSessions> = RefCell::new(HashMap::new());
     static UPLOADED_FILES: RefCell<UploadedFiles> = RefCell::new(HashMap::new());
-}
-
-// Generate unique ID
-fn generate_id() -> String {
-    let time = api::time();
-    let caller = api::caller();
-    format!("{}-{}", time, caller.to_text())
+    static TRANSCRIPTIONS: RefCell<Transcriptions> = RefCell::new(HashMap::new());
+    static JOBS: RefCell<Jobs> = RefCell::new(HashMap::new());
+    static SUMMARIES: RefCell<Summaries> = RefCell::new(HashMap::new());
 }
 
 #[update]
@@ -189,16 +146,7 @@ pub async fn complete_upload(session_id: String) -> Result<String, String> {
         files.borrow_mut().insert(file_id.clone(), uploaded_file);
     });
 
-    // Get transcription (dummy text or actual decoding from file)
-    let transcription = process_uploaded_file(&file_id).await.map_err(|e|
-        format!("Transcription failed: {}", e)
-    )?;
-
-    // Summarize transcription using ic_llm
-    let summary = summarize_transcription(transcription).await;
-    ic_cdk::println!("Summary: {}", summary);
-
-    Ok(summary)
+    Ok(file_id)
 }
 
 #[query]
@@ -284,124 +232,136 @@ pub fn delete_file(file_id: String) -> Result<String, String> {
     })
 }
 
-// Function to process uploaded file (implement your business logic here)
-async fn process_uploaded_file(file_id: &str) -> Result<String, String> {
+/* Transcription */
+#[update]
+pub async fn start_transcription(file_id: String) -> Result<String, String> {
     let file = UPLOADED_FILES.with(|files| {
         files
             .borrow()
-            .get(file_id)
+            .get(&file_id)
             .cloned()
             .ok_or_else(|| "File not found".to_string())
     })?;
 
     // Directly call the transcription service and return result
-    call_transcription_service(file).await
+    let job_id = call_transcription(file).await?;
+
+    // Store mapping
+    JOBS.with(|jobs| {
+        jobs.borrow_mut().insert(job_id.clone(), file_id.clone());
+    });
+
+    Ok(job_id)
 }
 
-async fn call_transcription_service(file: UploadedFile) -> Result<String, String> {
-    let base_url = "http://localhost:3000/transcribe";
-    let boundary = "----ic_boundary";
-    let chunk_size = 1_900_000; // ~1.9 MB
-    let session_id = file.id.clone();
+#[query]
+pub fn get_transcription(file_id: String) -> Result<String, String> {
+    TRANSCRIPTIONS.with(|map: &RefCell<HashMap<String, String>>| {
+        map.borrow()
+            .get(&file_id)
+            .cloned()
+            .ok_or_else(|| "No transcription found".to_string())
+    })
+}
 
-    let mut offset = 0;
-    let mut chunk_index = 0;
-
-    while offset < file.data.len() {
-        let end = usize::min(offset + chunk_size, file.data.len());
-        let chunk = &file.data[offset..end];
-
-        // Build multipart body for chunk
-        let mut body = Vec::new();
-
-        // Session ID
-        body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
-        body.extend_from_slice(b"Content-Disposition: form-data; name=\"session_id\"\r\n\r\n");
-        body.extend_from_slice(session_id.as_bytes());
-        body.extend_from_slice(b"\r\n");
-
-        // Chunk index
-        body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
-        body.extend_from_slice(b"Content-Disposition: form-data; name=\"chunk_index\"\r\n\r\n");
-        body.extend_from_slice(chunk_index.to_string().as_bytes());
-        body.extend_from_slice(b"\r\n");
-
-        // Chunk data
-        body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
-        body.extend_from_slice(
-            format!(
-                "Content-Disposition: form-data; name=\"file\"; filename=\"{}\"\r\n",
-                file.filename
-            ).as_bytes()
-        );
-        body.extend_from_slice(format!("Content-Type: {}\r\n\r\n", file.content_type).as_bytes());
-        body.extend_from_slice(chunk);
-        body.extend_from_slice(b"\r\n");
-        body.extend_from_slice(format!("--{}--\r\n", boundary).as_bytes());
-
-        // Calculate cycles
-        let request_size = body.len() as u64;
-        let response_size = 2_000_000u64;
-        let cycles = 400_000_000 + (request_size + response_size) * 600_000;
-        ic_cdk::println!(
-            "Estimated cycles for HTTP request: {} (request_size: {} bytes)",
-            cycles,
-            request_size
-        );
-
-        // Construct request
-        let request = CanisterHttpRequestArgument {
-            url: format!("{}/upload_chunk", base_url),
-            method: HttpMethod::POST,
-            headers: vec![HttpHeader {
-                name: "Content-Type".to_string(),
-                value: format!("multipart/form-data; boundary={}", boundary),
-            }],
-            body: Some(body),
-            max_response_bytes: Some(response_size),
-            transform: None,
-        };
-
-        http_request(request, cycles.into()).await.map_err(|e|
-            format!("Chunk {} upload failed: {:?}", chunk_index, e)
-        )?;
-
-        offset = end;
-        chunk_index += 1;
-    }
-
-    // Tell server we're done uploading
-    let finalize_body = serde_json
-        ::to_vec(&serde_json::json!({
-        "session_id": session_id
-    }))
-        .unwrap();
-
-    let request_size = finalize_body.len() as u64;
+#[update]
+pub async fn get_transcription_status(job_id: String) -> Result<JobStatus, String> {
     let response_size = 2_000_000u64;
-    let cycles = 400_000_000 + (request_size + response_size) * 600_000;
+    let cycles = 400_000_000 + (0 + response_size) * 600_000;
 
-    let finalize_request = CanisterHttpRequestArgument {
-        url: format!("{}/finalize_upload", base_url),
-        method: HttpMethod::POST,
-        headers: vec![HttpHeader {
-            name: "Content-Type".to_string(),
-            value: "application/json".to_string(),
-        }],
-        body: Some(finalize_body),
-        max_response_bytes: Some(2_000_000u64),
+    let status_req = CanisterHttpRequestArgument {
+        url: format!("{}/status/{}", TRANSCRIPTION_URL, job_id),
+        method: HttpMethod::GET,
+        headers: vec![],
+        body: None,
+        max_response_bytes: Some(response_size),
         transform: None,
     };
 
-    let (response,): (HttpResponse,) = http_request(finalize_request, cycles.into()).await.map_err(
-        |e| format!("Finalize request failed: {:?}", e)
+    let (status_res,): (HttpResponse,) = http_request(status_req, cycles.into()).await.map_err(|e| {
+        format!("Status request failed: {:?}", e)
+    })?;
+
+    let status_str = String::from_utf8(status_res.body).map_err(|_|
+        "Invalid UTF-8 in status response".to_string()
     )?;
 
-    let result = String::from_utf8(response.body).map_err(|_|
-        "Invalid UTF-8 in response".to_string()
+    // Deserialize JSON directly into JobStatus
+    let parsed: JobStatus = serde_json
+        ::from_str(&status_str)
+        .map_err(|e| format!("Invalid JSON: {:?}", e))?;
+
+    Ok(parsed)
+}
+
+#[update]
+pub async fn get_transcription_result(job_id: String) -> Result<String, String> {
+    let response_size = 2_000_000u64;
+    let cycles = 400_000_000 + (0 + response_size) * 600_000;
+
+    let result_req = CanisterHttpRequestArgument {
+        url: format!("{}/result/{}", TRANSCRIPTION_URL, job_id),
+        method: HttpMethod::GET,
+        headers: vec![],
+        body: None,
+        max_response_bytes: Some(response_size),
+        transform: None,
+    };
+
+    let (result_res,): (HttpResponse,) = http_request(result_req, cycles.into()).await.map_err(|e| {
+        format!("Result request failed: {:?}", e)
+    })?;
+
+    let result_str = String::from_utf8(result_res.body).map_err(|_|
+        "Invalid UTF-8 in result response".to_string()
     )?;
 
-    ic_cdk::println!("Transcription result: {}", result);
+    // Find matching file_id
+    if let Some(file_id) = JOBS.with(|jobs| jobs.borrow().get(&job_id).cloned()) {
+        TRANSCRIPTIONS.with(|map| {
+            map.borrow_mut().insert(file_id, result_str.clone());
+        });
+    } else {
+        return Err("No file ID found for this job ID".to_string());
+    }
 
-    Ok(result)
+    Ok(result_str)
+}
+
+/* Summarization */
+#[update]
+pub async fn start_summarization(file_id: String) -> Result<String, String> {
+    let job_id = generate_id();
+    let job_id_clone = job_id.clone();
+
+    SUMMARIES.with(|map| {
+        map.borrow_mut().insert(job_id.clone(), None);
+    });
+
+    ic_cdk::spawn(async move {
+        match TRANSCRIPTIONS.with(|map| map.borrow().get(&file_id).cloned()) {
+            Some(transcription) => {
+                match
+                    call_ollama(format!("Summarize the following text:\n\n{}", transcription)).await
+                {
+                    Ok(summary) => {
+                        SUMMARIES.with(|map| {
+                            map.borrow_mut().insert(job_id_clone, Some(summary));
+                        });
+                    }
+                    Err(e) => ic_cdk::println!("Summary failed: {}", e),
+                }
+            }
+            None => ic_cdk::println!("No transcription found for {}", file_id),
+        }
+    });
+
+    Ok(job_id)
+}
+
+#[query]
+pub fn get_summary_result(job_id: String) -> Result<String, String> {
+    SUMMARIES.with(|map| map.borrow().get(&job_id).cloned().flatten()).ok_or_else(||
+        "Summary not ready".to_string()
+    )
 }
