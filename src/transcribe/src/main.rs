@@ -32,11 +32,6 @@ struct UploadResponse {
 }
 
 #[derive(Serialize)]
-struct StatusResponse {
-    status: JobStatus,
-}
-
-#[derive(Serialize)]
 struct TranscriptionResponse {
     text: String,
 }
@@ -153,14 +148,13 @@ async fn finalize_upload(Json(data): Json<serde_json::Value>) -> Json<UploadResp
     })
 }
 
-async fn check_status(Path(job_id): Path<String>) -> Json<StatusResponse> {
+async fn check_status(Path(job_id): Path<String>) -> Json<JobStatus> {
     let jobs = JOBS.lock().unwrap();
-    let status = jobs
-        .get(&job_id)
-        .cloned()
-        .unwrap_or(JobStatus::Failed("Job not found".to_string()));
 
-    Json(StatusResponse { status })
+    jobs.get(&job_id)
+        .cloned()
+        .map(Json)
+        .unwrap_or(Json(JobStatus::Failed("Job not found".to_string())))
 }
 
 async fn get_result(Path(job_id): Path<String>) -> Json<TranscriptionResponse> {
