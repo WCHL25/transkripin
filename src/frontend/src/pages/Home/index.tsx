@@ -23,7 +23,7 @@ const Home = () => {
   const [file, setFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState("");
   const [snackbar, setSnackbar] = useState<SnackbarState | null>(null);
-  const [result, setResult] = useState<string>('')
+  const [result, setResult] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState(""); // 'idle', 'uploading', 'processing', 'complete', 'error'
@@ -31,16 +31,16 @@ const Home = () => {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const removeFile = () => {
-    setFile(null)
-    const dt = new DataTransfer()
+    setFile(null);
+    const dt = new DataTransfer();
     if (inputRef.current) {
-         inputRef.current.files = dt.files;
-      }
-  }
+      inputRef.current.files = dt.files;
+    }
+  };
 
   const validateFile = (file: File) => {
     if (!file.type.startsWith("video") && !file.type.startsWith("audio")) {
-      removeFile()
+      removeFile();
       setSnackbar({
         variant: "error",
         message: "File type not valid. Must be a video or audio.",
@@ -51,7 +51,7 @@ const Home = () => {
     // Check file size (max 100MB)
     const maxSize = 100 * 1024 * 1024; // 100MB
     if (file.size > maxSize) {
-      removeFile()
+      removeFile();
       setSnackbar({
         variant: "error",
         message: "File size too large. Maximum size is 100MB.",
@@ -103,7 +103,7 @@ const Home = () => {
         }
 
         // Update progress
-        const progress = ((i + 1) / totalChunks) * 70; // 70% for upload
+        const progress = ((i + 1) / totalChunks) * 70;
         setUploadProgress(progress);
       }
 
@@ -112,33 +112,85 @@ const Home = () => {
       setUploadProgress(80);
 
       const completeResult = await backend.complete_upload(sessionId);
+      if ("Err" in completeResult) throw new Error(completeResult.Err);
+      const fileId = completeResult.Ok;
 
-      console.log("completeResult", completeResult);
+      // Transcribe File
+      console.log("Transcribe File");
+      const startTranscribeJob = await backend.start_transcription(fileId);
+      if ("Err" in startTranscribeJob) throw new Error(startTranscribeJob.Err);
 
-      if ("Err" in completeResult) {
-        throw new Error(completeResult.Err);
+      const transcribeJobId = startTranscribeJob.Ok;
+
+      console.log("Transcription Started:", startTranscribeJob.Ok);
+
+      // Poll status until complete
+      while (true) {
+        const statusResult = await backend.get_transcription_status(
+          transcribeJobId
+        );
+
+        if ("Err" in statusResult) throw new Error(statusResult.Err);
+
+        const status = statusResult.Ok;
+
+        if ("Pending" in status) {
+          console.log("Still pending, waiting...");
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          continue;
+        }
+
+        if ("Completed" in status) {
+          console.log("✅ Completed:", status.Completed);
+          break;
+        }
+
+        if ("Failed" in status) {
+          console.error("❌ Failed:", status.Failed);
+          break;
+        }
       }
+
+      // Fetch transcription result
+      setUploadProgress(90);
+      const result = await backend.get_transcription_result(transcribeJobId);
+      if ("Err" in result) throw new Error(result.Err);
+      console.log("Transcription result:", result.Ok);
+
+      // Start summarization
+      console.log("Start summarization");
+      setUploadProgress(95);
+      const startSummaryJob = await backend.start_summarization(fileId);
+      if ("Err" in startSummaryJob) throw new Error(startSummaryJob.Err);
+      const summaryJobId = startSummaryJob.Ok;
+
+      let finalResult: string | null = null;
+      while (true) {
+        const res = await backend.get_summary_result(summaryJobId);
+
+        if ("Ok" in res) {
+          finalResult = res.Ok;
+          break;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+      }
+
+      console.log("Summary done:", finalResult);
 
       setUploadProgress(100);
       setUploadStatus("complete");
-      setResult(completeResult.Ok)
+      setResult(finalResult!);
 
       setSnackbar({
         variant: "success",
         message: "File uploaded successfully!",
       });
 
-      // You can handle the response here (e.g., file ID, transcription result, etc.)
-      console.log("Upload completed:", completeResult.Ok);
-      console.log()
-
       setVideoUrl(URL.createObjectURL(file));
 
       setTimeout(() => {
-        window.scrollTo({
-          behavior: "smooth",
-          top: 1000,
-        });
+        window.scrollTo({ behavior: "smooth", top: 1000 });
       }, 1000);
     } catch (error: any) {
       console.error("Upload error:", error);
@@ -215,7 +267,10 @@ const Home = () => {
 
       <Header />
 
-      <Box component="main" className="container mx-auto px-5 pb-10 relative overflow-hidden">
+      <Box
+        component="main"
+        className="container mx-auto px-5 pb-10 relative overflow-hidden"
+      >
         <Box className="bg-background2 blur-[70px] absolute -top-20 rounded-full w-[1200px] h-96 left-1/2 -translate-x-1/2 -z-10"></Box>
 
         <Box className="min-h-dvh grid place-items-center py-20 text-center">
@@ -337,7 +392,11 @@ const Home = () => {
         </Box>
 
         {uploadStatus === "complete" && videoUrl && (
-          <Result videoUrl={videoUrl} type={file?.type || ''} summary={result} />
+          <Result
+            videoUrl={videoUrl}
+            type={file?.type || ""}
+            summary={result}
+          />
         )}
       </Box>
     </>

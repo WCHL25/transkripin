@@ -29,7 +29,7 @@ frontend/dist/
 # Rust build artifacts
 target/
 Cargo.lock
-
+uploads/
 .devcontainer/
 
 
