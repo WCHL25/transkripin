@@ -10,9 +10,9 @@ import { FaPlus } from "react-icons/fa6";
 import { FaCloudUploadAlt } from "react-icons/fa";
 import Header from "@/components/Header";
 import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
-import { backend } from "declarations/backend";
 import { fileToChunks } from "@/utils/fileUtils";
 import Result from "@/pages/Home/components/Result";
+import { useBackend } from "@/hooks/useBackend";
 
 interface SnackbarState {
   variant: "success" | "error";
@@ -62,6 +62,8 @@ const Home = () => {
     return true;
   };
 
+  const backend = useBackend()
+
   const uploadFile = async (file: File) => {
     try {
       setUploading(true);
@@ -90,6 +92,8 @@ const Home = () => {
       }
 
       const sessionId = uploadSession.Ok;
+
+      console.log("Upload session started, ID:", sessionId);
 
       // Track upload progress properly
       let completedChunks = 0;

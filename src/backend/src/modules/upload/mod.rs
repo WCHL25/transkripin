@@ -119,7 +119,7 @@ pub async fn complete_upload(session_id: String) -> Result<String, String> {
                     return Err("Not all chunks have been uploaded".to_string());
                 }
 
-                let mut file_data = Vec::new();
+                 let mut file_data = Vec::with_capacity(session.total_size as usize);
                 for chunk in &session.uploaded_chunks {
                     if chunk.is_empty() {
                         return Err("Missing chunk data".to_string());
