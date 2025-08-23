@@ -48,7 +48,7 @@ pub fn start_upload(request: StartUploadRequest) -> Result<String, String> {
         content_type: request.content_type,
         total_size: request.total_size,
         total_chunks: request.total_chunks,
-        uploaded_chunks: Vec::new(),
+        uploaded_chunks: Vec::with_capacity(request.total_chunks as usize),
         owner: caller,
         created_at: api::time(),
     };
@@ -79,13 +79,20 @@ pub fn upload_chunk(request: UploadChunkRequest) -> Result<String, String> {
                     return Err("Invalid chunk index".to_string());
                 }
 
-                // Ensure we have enough space for this chunk
-                while session.uploaded_chunks.len() <= (request.chunk_index as usize) {
-                    session.uploaded_chunks.push(Vec::new());
+                let chunk_idx = request.chunk_index as usize;
+
+                // Pre-allocate if needed (more efficient than growing one by one)
+                if session.uploaded_chunks.len() <= chunk_idx {
+                    session.uploaded_chunks.resize(session.total_chunks as usize, Vec::new());
+                }
+
+                // Validate chunk isn't already uploaded (prevent duplicates)
+                if !session.uploaded_chunks[chunk_idx].is_empty() {
+                    return Err("Chunk already uploaded".to_string());
                 }
 
                 // Store the chunk
-                session.uploaded_chunks[request.chunk_index as usize] = request.data;
+                session.uploaded_chunks[chunk_idx] = request.data;
 
                 Ok("Chunk uploaded successfully".to_string())
             }
