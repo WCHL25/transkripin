@@ -1,7 +1,7 @@
 import { Box, Button } from "@mui/material";
 import logo from "@/assets/img/logo_blue.svg";
 import { useEffect, useState } from "react";
-import { useAuth } from "@ic-reactor/react";
+import { useAuth, useUpdateCall } from "@ic-reactor/react";
 import { useBackend } from "@/hooks/useBackend";
 
 const MAX_SCROLL = 200;
@@ -21,39 +21,25 @@ const Header = () => {
     };
   }, []);
 
-  // const {
-  //   call: loginCall,
-  // } = useUpdateCall({
-  //   functionName: "login",
-  //   onSuccess: (result) => {
-  //     console.log("Login call successful:", result);
-  //   },
-  //   onError: (err) => {
-  //     console.error("Login call error:", err);
-  //   },
-  // });
+  const {
+    call: loginCall,
+  } = useUpdateCall({
+    functionName: "login",
+    onSuccess: (result) => {
+      console.log("Login call successful:", result);
+    },
+    onError: (err) => {
+      console.error("Login call error:", err);
+    },
+  });
 
   const backend = useBackend();
-
-  // const {
-  //   call: logoutCall,
-  // } = useUpdateCall({
-  //   functionName: "logout",
-  //   onSuccess: (result) => {
-  //     console.log("Logout call successful:", result);
-  //   },
-  //   onError: (err) => {
-  //     console.error("Logout call error:", err);
-  //   },
-  // });
 
   const { logout, login, isAuthenticating, isAuthenticated } = useAuth({
     onLoginSuccess: async (principal) => {
       console.log("Login successful, identity:", principal.toText() || "");
 
-      // loginCall();
-      const res = await backend.login();
-      console.log("Login response:", res);
+      loginCall();
     },
   });
 
