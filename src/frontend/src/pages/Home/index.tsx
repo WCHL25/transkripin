@@ -68,9 +68,14 @@ const Home = () => {
       setUploadStatus("uploading");
       setUploadProgress(0);
 
-      // Convert file to chunks
-      const chunks = await fileToChunks(file);
+      // Optimize chunk size - larger chunks for better performance
+      const CHUNK_SIZE = 1024 * 1024; // 1MB chunks instead of default small chunks
+      const chunks = await fileToChunks(file, CHUNK_SIZE);
       const totalChunks = chunks.length;
+
+      console.log(
+        `File size: ${file.size} bytes, Chunks: ${totalChunks}, Chunk size: ${CHUNK_SIZE}`
+      );
 
       // Start upload session
       const uploadSession = await backend.start_upload({
@@ -80,103 +85,142 @@ const Home = () => {
         total_chunks: BigInt(totalChunks),
       });
 
-      console.log("uploadSession", uploadSession);
-
       if ("Err" in uploadSession) {
         throw new Error(uploadSession.Err);
       }
 
       const sessionId = uploadSession.Ok;
 
-      // Upload chunks with progress tracking
-      for (let i = 0; i < chunks.length; i++) {
-        const result = await backend.upload_chunk({
-          session_id: sessionId,
-          chunk_index: BigInt(i),
-          data: chunks[i],
+      // Track upload progress properly
+      let completedChunks = 0;
+      const progressLock = { current: 0 }; // Prevent progress from going backwards
+
+      const updateProgress = () => {
+        const newProgress = Math.min((completedChunks / totalChunks) * 70, 70);
+        if (newProgress > progressLock.current) {
+          progressLock.current = newProgress;
+          setUploadProgress(newProgress);
+        }
+      };
+
+      // Upload chunks in parallel batches for better performance
+      const BATCH_SIZE = 5; // Upload 3 chunks simultaneously
+
+      for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+        const batch = chunks.slice(i, Math.min(i + BATCH_SIZE, chunks.length));
+        const batchPromises = batch.map(async (chunk, batchIndex) => {
+          const chunkIndex = i + batchIndex;
+
+          try {
+            const result = await backend.upload_chunk({
+              session_id: sessionId,
+              chunk_index: BigInt(chunkIndex),
+              data: chunk,
+            });
+
+            if ("Err" in result) {
+              throw new Error(`Chunk ${chunkIndex} failed: ${result.Err}`);
+            }
+
+            // Atomic increment and progress update
+            completedChunks++;
+            updateProgress();
+
+            return result;
+          } catch (error) {
+            console.error(`Chunk ${chunkIndex} upload failed:`, error);
+            throw error;
+          }
         });
 
-        console.log("result", result);
+        // Wait for current batch to complete before starting next batch
+        await Promise.all(batchPromises);
 
-        if ("Err" in result) {
-          throw new Error(result.Err);
+        // Small delay to prevent overwhelming the backend
+        if (i + BATCH_SIZE < chunks.length) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
         }
-
-        // Update progress
-        const progress = ((i + 1) / totalChunks) * 70;
-        setUploadProgress(progress);
       }
 
       // Complete upload
       setUploadStatus("processing");
-      setUploadProgress(80);
+      setUploadProgress(75);
 
       const completeResult = await backend.complete_upload(sessionId);
       if ("Err" in completeResult) throw new Error(completeResult.Err);
       const fileId = completeResult.Ok;
 
-      // Transcribe File
-      console.log("Transcribe File");
+      // Start transcription
+      console.log("Starting transcription...");
+      setUploadProgress(80);
+
       const startTranscribeJob = await backend.start_transcription(fileId);
       if ("Err" in startTranscribeJob) throw new Error(startTranscribeJob.Err);
-
       const transcribeJobId = startTranscribeJob.Ok;
 
-      console.log("Transcription Started:", startTranscribeJob.Ok);
+      // Optimized polling with exponential backoff
+      let pollInterval = 2000; // Start with 2 seconds
+      const maxInterval = 10000; // Max 10 seconds
 
-      // Poll status until complete
       while (true) {
         const statusResult = await backend.get_transcription_status(
           transcribeJobId
         );
 
         if ("Err" in statusResult) throw new Error(statusResult.Err);
-
         const status = statusResult.Ok;
 
         if ("Pending" in status) {
-          console.log("Still pending, waiting...");
-          await new Promise((resolve) => setTimeout(resolve, 3000));
+          console.log("Transcription in progress...");
+          await new Promise((resolve) => setTimeout(resolve, pollInterval));
+          // Gradually increase poll interval to reduce backend load
+          pollInterval = Math.min(pollInterval * 1.2, maxInterval);
           continue;
         }
 
         if ("Completed" in status) {
-          console.log("✅ Completed:", status.Completed);
+          console.log("✅ Transcription completed");
           break;
         }
 
         if ("Failed" in status) {
-          console.error("❌ Failed:", status.Failed);
-          break;
+          throw new Error(`Transcription failed: ${status.Failed}`);
         }
       }
 
       // Fetch transcription result
       setUploadProgress(90);
-      const result = await backend.get_transcription_result(transcribeJobId);
-      if ("Err" in result) throw new Error(result.Err);
-      console.log("Transcription result:", result.Ok);
+      const transcriptionResult = await backend.get_transcription_result(
+        transcribeJobId
+      );
+      if ("Err" in transcriptionResult)
+        throw new Error(transcriptionResult.Err);
 
       // Start summarization
-      console.log("Start summarization");
+      console.log("Starting summarization...");
       setUploadProgress(95);
+
       const startSummaryJob = await backend.start_summarization(fileId);
       if ("Err" in startSummaryJob) throw new Error(startSummaryJob.Err);
       const summaryJobId = startSummaryJob.Ok;
 
+      // Optimized polling for summary
+      pollInterval = 1000; // Reset to 1 second for summary
       let finalResult: string | null = null;
-      while (true) {
-        const res = await backend.get_summary_result(summaryJobId);
 
-        if ("Ok" in res) {
-          finalResult = res.Ok;
+      while (true) {
+        const summaryResult = await backend.get_summary_result(summaryJobId);
+
+        if ("Ok" in summaryResult) {
+          finalResult = summaryResult.Ok;
           break;
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        await new Promise((resolve) => setTimeout(resolve, pollInterval));
+        pollInterval = Math.min(pollInterval * 1.1, 5000); // Max 5 seconds for summary
       }
 
-      console.log("Summary done:", finalResult);
+      console.log("Summary completed");
 
       setUploadProgress(100);
       setUploadStatus("complete");
@@ -184,17 +228,19 @@ const Home = () => {
 
       setSnackbar({
         variant: "success",
-        message: "File uploaded successfully!",
+        message: "File processed successfully!",
       });
 
       setVideoUrl(URL.createObjectURL(file));
 
+      // Smooth scroll to results
       setTimeout(() => {
         window.scrollTo({ behavior: "smooth", top: 1000 });
-      }, 1000);
+      }, 500);
     } catch (error: any) {
       console.error("Upload error:", error);
       setUploadStatus("error");
+      setUploadProgress(0);
       setSnackbar({
         variant: "error",
         message: `Upload failed: ${error.message}`,
