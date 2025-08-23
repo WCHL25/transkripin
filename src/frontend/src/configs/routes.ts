@@ -1,23 +1,16 @@
-import { lazy } from "react";
+import { createBrowserRouter } from "react-router-dom";
 
-export interface Route {
-  component: React.LazyExoticComponent<() => JSX.Element> | (() => JSX.Element);
-  path?: string;
-  key?: string;
-  children?: Route[];
-}
-
-export const publicRoutes: Route[] = [
+export const router = createBrowserRouter([
   {
     path: "/",
-    component: lazy(() => import("../pages/Home")),
+    lazy: async () => ({
+      Component: (await import("@/pages/Home")).default,
+    }),
   },
-  // {
-  //   path: "/login",
-  //   component: lazy(() => import("../pages/Login")),
-  // },
-];
-
-export const protectedRoutes: Route[] = [];
-
-export const routes: Route[] = [...publicRoutes, ...protectedRoutes];
+  {
+    path: "*",
+    lazy: async () => ({
+      Component: (await import("@/pages/NotFound")).default,
+    }),
+  },
+])
