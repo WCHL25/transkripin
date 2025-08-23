@@ -64,7 +64,7 @@ You can download it directly from Hugging Face.
 
 ```bash
 # Navigate to the models directory
-cd backend/assets/models
+cd src/transcribe/assets/models
 
 # Download the model
 wget https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
