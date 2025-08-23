@@ -62,7 +62,7 @@ const Home = () => {
     return true;
   };
 
-  const backend = useBackend()
+  const backend = useBackend();
 
   const uploadFile = async (file: File) => {
     try {
@@ -197,6 +197,8 @@ const Home = () => {
       const transcriptionResult = await backend.get_transcription_result(
         transcribeJobId
       );
+      console.log("Transcription result:", transcriptionResult);
+
       if ("Err" in transcriptionResult)
         throw new Error(transcriptionResult.Err);
 
