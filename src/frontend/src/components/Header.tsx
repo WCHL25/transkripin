@@ -1,6 +1,8 @@
-import { Box } from "@mui/material";
+import { Box, Button } from "@mui/material";
 import logo from "@/assets/img/logo_blue.svg";
 import { useEffect, useState } from "react";
+import { useAuth } from "@ic-reactor/react";
+import { useBackend } from "@/hooks/useBackend";
 
 const MAX_SCROLL = 200;
 
@@ -19,6 +21,57 @@ const Header = () => {
     };
   }, []);
 
+  // const {
+  //   call: loginCall,
+  // } = useUpdateCall({
+  //   functionName: "login",
+  //   onSuccess: (result) => {
+  //     console.log("Login call successful:", result);
+  //   },
+  //   onError: (err) => {
+  //     console.error("Login call error:", err);
+  //   },
+  // });
+
+  const backend = useBackend();
+
+  // const {
+  //   call: logoutCall,
+  // } = useUpdateCall({
+  //   functionName: "logout",
+  //   onSuccess: (result) => {
+  //     console.log("Logout call successful:", result);
+  //   },
+  //   onError: (err) => {
+  //     console.error("Logout call error:", err);
+  //   },
+  // });
+
+  const { logout, login, isAuthenticating, isAuthenticated } = useAuth({
+    onLoginSuccess: async (principal) => {
+      console.log("Login successful, identity:", principal.toText() || "");
+
+      // loginCall();
+      const res = await backend.login();
+      console.log("Login response:", res);
+    },
+  });
+
+  const handleLogin = () => {
+    if (!isAuthenticating) {
+      login();
+    }
+  };
+
+  const handleLogout =async  () => {
+    if (!isAuthenticating) {
+      // await logoutCall();
+      const res = await backend.logout();
+      console.log("Logout response:", res);
+      logout();
+    }
+  };
+
   return (
     <Box
       component="header"
@@ -32,15 +85,16 @@ const Header = () => {
           <span className="font-bold text-lg">Transkripin</span>
         </Box>
 
-        {/* <Box>
+        <Box>
           <Button
             variant="contained"
             className="rounded-full"
-            onClick={() => navigate("/login")}
+            onClick={() => (isAuthenticated ? handleLogout() : handleLogin())}
+            loading={isAuthenticating}
           >
-            Login
+            {isAuthenticated ? "Logout" : "Login"}
           </Button>
-        </Box> */}
+        </Box>
       </Box>
     </Box>
   );
