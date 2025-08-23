@@ -37,6 +37,34 @@ thread_local! {
         let memory = MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_PRINCIPALS));
         StableBTreeMap::init(memory)
     });
+
+    static UPLOAD_SESSIONS: RefCell<
+        StableBTreeMap<String, UploadSession, VirtualMemory<DefaultMemoryImpl>>
+    > = RefCell::new(
+        StableBTreeMap::init(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_UPLOAD_SESSIONS)))
+    );
+
+    static UPLOADED_FILES: RefCell<
+        StableBTreeMap<String, UploadedFile, VirtualMemory<DefaultMemoryImpl>>
+    > = RefCell::new(
+        StableBTreeMap::init(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_UPLOADED_FILES)))
+    );
+
+    static TRANSCRIPTIONS: RefCell<
+        StableBTreeMap<String, String, VirtualMemory<DefaultMemoryImpl>>
+    > = RefCell::new(
+        StableBTreeMap::init(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_TRANSCRIPTIONS)))
+    );
+
+    static JOBS: RefCell<
+        StableBTreeMap<String, String, VirtualMemory<DefaultMemoryImpl>>
+    > = RefCell::new(StableBTreeMap::init(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_JOBS))));
+
+    static SUMMARIES: RefCell<
+        StableBTreeMap<String, Option<String>, VirtualMemory<DefaultMemoryImpl>>
+    > = RefCell::new(
+        StableBTreeMap::init(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_SUMMARIES)))
+    );
 }
 
 #[init]

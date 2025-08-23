@@ -1,6 +1,8 @@
 use candid::{ CandidType, Principal };
 use serde::Deserialize;
 
+use crate::impl_storable;
+
 #[derive(CandidType, Deserialize, Clone)]
 pub struct UploadSession {
     pub id: String,
@@ -12,3 +14,5 @@ pub struct UploadSession {
     pub owner: Principal,
     pub created_at: u64,
 }
+
+impl_storable!(UploadSession);

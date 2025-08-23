@@ -1,4 +1,3 @@
-use std::{ collections::HashMap, cell::RefCell };
 use ic_cdk::{
     api::{
         self,
@@ -14,19 +13,10 @@ use ic_cdk::{
 };
 
 pub mod domain;
-
 pub use domain::*;
+use crate::{ common::*, UPLOAD_SESSIONS, UPLOADED_FILES, TRANSCRIPTIONS, JOBS, SUMMARIES };
 
-use crate::common::*;
-
-thread_local! {
-    static UPLOAD_SESSIONS: RefCell<UploadSessions> = RefCell::new(HashMap::new());
-    static UPLOADED_FILES: RefCell<UploadedFiles> = RefCell::new(HashMap::new());
-    static TRANSCRIPTIONS: RefCell<Transcriptions> = RefCell::new(HashMap::new());
-    static JOBS: RefCell<Jobs> = RefCell::new(HashMap::new());
-    static SUMMARIES: RefCell<Summaries> = RefCell::new(HashMap::new());
-}
-
+/* UPLOAD HANDLERS */
 #[update]
 pub fn start_upload(request: StartUploadRequest) -> Result<String, String> {
     let caller = api::caller();
@@ -53,10 +43,7 @@ pub fn start_upload(request: StartUploadRequest) -> Result<String, String> {
         created_at: api::time(),
     };
 
-    UPLOAD_SESSIONS.with(|sessions| {
-        sessions.borrow_mut().insert(session_id.clone(), session);
-    });
-
+    UPLOAD_SESSIONS.with(|sessions| sessions.borrow_mut().insert(session_id.clone(), session));
     Ok(session_id)
 }
 
@@ -67,36 +54,35 @@ pub fn upload_chunk(request: UploadChunkRequest) -> Result<String, String> {
     UPLOAD_SESSIONS.with(|sessions| {
         let mut sessions = sessions.borrow_mut();
 
-        match sessions.get_mut(&request.session_id) {
-            Some(session) => {
-                // Verify ownership
-                if session.owner != caller {
-                    return Err("Unauthorized: You don't own this upload session".to_string());
-                }
-
-                // Validate chunk index
-                if request.chunk_index >= session.total_chunks {
-                    return Err("Invalid chunk index".to_string());
-                }
-
-                let chunk_idx = request.chunk_index as usize;
-
-                // Pre-allocate if needed (more efficient than growing one by one)
-                if session.uploaded_chunks.len() <= chunk_idx {
-                    session.uploaded_chunks.resize(session.total_chunks as usize, Vec::new());
-                }
-
-                // Validate chunk isn't already uploaded (prevent duplicates)
-                if !session.uploaded_chunks[chunk_idx].is_empty() {
-                    return Err("Chunk already uploaded".to_string());
-                }
-
-                // Store the chunk
-                session.uploaded_chunks[chunk_idx] = request.data;
-
-                Ok("Chunk uploaded successfully".to_string())
+        // Remove the session temporarily
+        if let Some(mut session) = sessions.remove(&request.session_id) {
+            if session.owner != caller {
+                // Put it back before returning
+                sessions.insert(request.session_id.clone(), session);
+                return Err("Unauthorized: You don't own this upload session".to_string());
             }
-            None => Err("Upload session not found".to_string()),
+            if request.chunk_index >= session.total_chunks {
+                sessions.insert(request.session_id.clone(), session);
+                return Err("Invalid chunk index".to_string());
+            }
+
+            let idx = request.chunk_index as usize;
+            if session.uploaded_chunks.len() <= idx {
+                session.uploaded_chunks.resize(session.total_chunks as usize, Vec::new());
+            }
+            if !session.uploaded_chunks[idx].is_empty() {
+                sessions.insert(request.session_id.clone(), session);
+                return Err("Chunk already uploaded".to_string());
+            }
+
+            session.uploaded_chunks[idx] = request.data;
+
+            // Re-insert the modified session
+            sessions.insert(request.session_id.clone(), session);
+
+            Ok("Chunk uploaded successfully".to_string())
+        } else {
+            Err("Upload session not found".to_string())
         }
     })
 }
@@ -104,22 +90,18 @@ pub fn upload_chunk(request: UploadChunkRequest) -> Result<String, String> {
 #[update]
 pub async fn complete_upload(session_id: String) -> Result<String, String> {
     let caller = api::caller();
-
-    // Extract the session and build UploadedFile
     let uploaded_file = UPLOAD_SESSIONS.with(|sessions| {
         let mut sessions = sessions.borrow_mut();
-
         match sessions.remove(&session_id) {
             Some(session) => {
                 if session.owner != caller {
                     return Err("Unauthorized: You don't own this upload session".to_string());
                 }
-
                 if session.uploaded_chunks.len() != (session.total_chunks as usize) {
                     return Err("Not all chunks have been uploaded".to_string());
                 }
 
-                 let mut file_data = Vec::with_capacity(session.total_size as usize);
+                let mut file_data = Vec::new();
                 for chunk in &session.uploaded_chunks {
                     if chunk.is_empty() {
                         return Err("Missing chunk data".to_string());
@@ -147,33 +129,25 @@ pub async fn complete_upload(session_id: String) -> Result<String, String> {
     })?;
 
     let file_id = uploaded_file.id.clone();
-
-    // Store the file
-    UPLOADED_FILES.with(|files| {
-        files.borrow_mut().insert(file_id.clone(), uploaded_file);
-    });
-
+    UPLOADED_FILES.with(|files| files.borrow_mut().insert(file_id.clone(), uploaded_file));
     Ok(file_id)
 }
 
+/* Queries for uploads */
 #[query]
 pub fn get_upload_status(session_id: String) -> Result<(u64, u64), String> {
     let caller = api::caller();
-
     UPLOAD_SESSIONS.with(|sessions| {
         let sessions = sessions.borrow();
-
         match sessions.get(&session_id) {
             Some(session) => {
                 if session.owner != caller {
                     return Err("Unauthorized".to_string());
                 }
-
                 let uploaded_chunks = session.uploaded_chunks
                     .iter()
-                    .filter(|chunk| !chunk.is_empty())
+                    .filter(|c| !c.is_empty())
                     .count() as u64;
-
                 Ok((uploaded_chunks, session.total_chunks))
             }
             None => Err("Upload session not found".to_string()),
@@ -184,15 +158,12 @@ pub fn get_upload_status(session_id: String) -> Result<(u64, u64), String> {
 #[query]
 pub fn get_file(file_id: String) -> Result<UploadedFile, String> {
     let caller = api::caller();
-
     UPLOADED_FILES.with(|files| {
         let files = files.borrow();
-
         match files.get(&file_id) {
-            Some(file) => {
-                if file.owner != caller {
-                    return Err("Unauthorized".to_string());
-                }
+            Some(file) => if file.owner != caller {
+                Err("Unauthorized".to_string())
+            } else {
                 Ok(file.clone())
             }
             None => Err("File not found".to_string()),
@@ -203,18 +174,12 @@ pub fn get_file(file_id: String) -> Result<UploadedFile, String> {
 #[query]
 pub fn list_files() -> Vec<(String, String, String, u64)> {
     let caller = api::caller();
-
     UPLOADED_FILES.with(|files| {
         files
             .borrow()
             .values()
-            .filter(|file| file.owner == caller)
-            .map(|file| (
-                file.id.clone(),
-                file.filename.clone(),
-                file.content_type.clone(),
-                file.size,
-            ))
+            .filter(|f| f.owner == caller)
+            .map(|f| (f.id.clone(), f.filename.clone(), f.content_type.clone(), f.size))
             .collect()
     })
 }
@@ -222,17 +187,14 @@ pub fn list_files() -> Vec<(String, String, String, u64)> {
 #[update]
 pub fn delete_file(file_id: String) -> Result<String, String> {
     let caller = api::caller();
-
     UPLOADED_FILES.with(|files| {
         let mut files = files.borrow_mut();
-
         match files.get(&file_id) {
-            Some(file) => {
-                if file.owner != caller {
-                    return Err("Unauthorized".to_string());
-                }
+            Some(f) => if f.owner != caller {
+                Err("Unauthorized".to_string())
+            } else {
                 files.remove(&file_id);
-                Ok("File deleted successfully".to_string())
+                Ok("File deleted".to_string())
             }
             None => Err("File not found".to_string()),
         }
@@ -242,32 +204,18 @@ pub fn delete_file(file_id: String) -> Result<String, String> {
 /* Transcription */
 #[update]
 pub async fn start_transcription(file_id: String) -> Result<String, String> {
-    let file = UPLOADED_FILES.with(|files| {
-        files
-            .borrow()
-            .get(&file_id)
-            .cloned()
-            .ok_or_else(|| "File not found".to_string())
-    })?;
-
-    // Directly call the transcription service and return result
+    let file = UPLOADED_FILES.with(|files|
+        files.borrow().get(&file_id).ok_or("File not found".to_string())
+    )?;
     let job_id = call_transcription(file).await?;
-
-    // Store mapping
-    JOBS.with(|jobs| {
-        jobs.borrow_mut().insert(job_id.clone(), file_id.clone());
-    });
-
+    JOBS.with(|jobs| jobs.borrow_mut().insert(job_id.clone(), file_id));
     Ok(job_id)
 }
 
 #[query]
 pub fn get_transcription(file_id: String) -> Result<String, String> {
-    TRANSCRIPTIONS.with(|map: &RefCell<HashMap<String, String>>| {
-        map.borrow()
-            .get(&file_id)
-            .cloned()
-            .ok_or_else(|| "No transcription found".to_string())
+    TRANSCRIPTIONS.with(|map| {
+        map.borrow().get(&file_id).ok_or("No transcription found".to_string())
     })
 }
 
@@ -324,7 +272,7 @@ pub async fn get_transcription_result(job_id: String) -> Result<String, String> 
     )?;
 
     // Find matching file_id
-    if let Some(file_id) = JOBS.with(|jobs| jobs.borrow().get(&job_id).cloned()) {
+    if let Some(file_id) = JOBS.with(|jobs| jobs.borrow().get(&job_id)) {
         TRANSCRIPTIONS.with(|map| {
             map.borrow_mut().insert(file_id, result_str.clone());
         });
@@ -346,7 +294,7 @@ pub async fn start_summarization(file_id: String) -> Result<String, String> {
     });
 
     ic_cdk::spawn(async move {
-        match TRANSCRIPTIONS.with(|map| map.borrow().get(&file_id).cloned()) {
+        match TRANSCRIPTIONS.with(|map| map.borrow().get(&file_id)) {
             Some(transcription) => {
                 match
                     call_ollama(format!("Summarize the following text:\n\n{}", transcription)).await
@@ -368,7 +316,7 @@ pub async fn start_summarization(file_id: String) -> Result<String, String> {
 
 #[query]
 pub fn get_summary_result(job_id: String) -> Result<String, String> {
-    SUMMARIES.with(|map| map.borrow().get(&job_id).cloned().flatten()).ok_or_else(||
+    SUMMARIES.with(|map| map.borrow().get(&job_id).flatten()).ok_or_else(||
         "Summary not ready".to_string()
     )
 }
