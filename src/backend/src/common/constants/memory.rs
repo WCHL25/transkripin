@@ -7,3 +7,4 @@ pub const MEMORY_ID_UPLOADED_FILES: MemoryId = MemoryId::new(3);
 pub const MEMORY_ID_TRANSCRIPTIONS: MemoryId = MemoryId::new(4);
 pub const MEMORY_ID_JOBS: MemoryId = MemoryId::new(5);
 pub const MEMORY_ID_SUMMARIES: MemoryId = MemoryId::new(6);
+pub const MEMORY_ID_FINAL_RESULTS: MemoryId = MemoryId::new(7);
