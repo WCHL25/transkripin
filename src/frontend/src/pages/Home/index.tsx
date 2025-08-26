@@ -327,7 +327,7 @@ const Home = () => {
 
    return (
       <>
-         <Box component="main" className="px-5 pb-10 relative overflow-hidden">
+         <Box component="main" className="px-5 relative overflow-hidden">
             <Box className="bg-background3/30 blur-[70px] absolute -top-20 rounded-full w-[1200px] h-96 left-1/2 -translate-x-1/2 -z-10"></Box>
 
             <Box className="min-h-dvh grid place-items-center py-20 text-center">
