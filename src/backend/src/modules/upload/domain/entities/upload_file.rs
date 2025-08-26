@@ -1,9 +1,9 @@
 use candid::{ CandidType, Principal };
-use serde::Deserialize;
+use serde::{ Deserialize, Serialize };
 
 use crate::impl_storable;
 
-#[derive(CandidType, Deserialize, Clone)]
+#[derive(CandidType, Serialize, Deserialize, Clone)]
 pub struct UploadedFile {
     pub id: String,
     pub filename: String,
