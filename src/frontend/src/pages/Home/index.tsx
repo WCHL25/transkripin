@@ -214,15 +214,15 @@ const Home = () => {
          console.log("Starting summarization...");
          setUploadProgress(95);
 
-      const startSummaryJob = await backend.start_summarization(fileId);
-      if ("Err" in startSummaryJob) throw new Error(startSummaryJob.Err);
+         const startSummaryJob = await backend.start_summarization(fileId);
+         if ("Err" in startSummaryJob) throw new Error(startSummaryJob.Err);
 
          // Optimized polling for summary
          pollInterval = 1000; // Reset to 1 second for summary
          let finalResult: string | null = null;
 
-      while (true) {
-        const summaryResult = await backend.get_summary_result(fileId);
+         while (true) {
+            const summaryResult = await backend.get_summary_result(fileId);
 
             if ("Ok" in summaryResult) {
                finalResult = summaryResult.Ok;
@@ -233,8 +233,8 @@ const Home = () => {
             pollInterval = Math.min(pollInterval * 1.1, 5000); // Max 5 seconds for summary
          }
 
-      console.log("Summary result", finalResult);
-      console.log("Summary completed");
+         console.log("Summary result", finalResult);
+         console.log("Summary completed");
 
          setUploadProgress(100);
          setUploadStatus("complete");
@@ -244,15 +244,16 @@ const Home = () => {
             message: "File processed successfully!",
          });
 
-         setVideoUrl(URL.createObjectURL(file));
+         const url = URL.createObjectURL(file)
+         setVideoUrl(url);
 
          navigate(`/saved/${fileId}`, {
             state: {
-               videoUrl: videoUrl,
+               videoUrl: url,
                summary: finalResult,
                filename: file.name,
                fileSize: file.size,
-               fileType: file.type
+               fileType: file.type,
             },
          });
 
