@@ -95,14 +95,18 @@ const Header = () => {
                   </Button>
                ) : (
                   <>
-                  <IconButton onClick={handleClick}>
-
-                     <Avatar className="w-12 h-12" />
-                  </IconButton>
+                     <IconButton onClick={handleClick}>
+                        <Avatar className="w-12 h-12" />
+                     </IconButton>
                      <Menu
                         anchorEl={anchorEl}
                         open={open}
                         onClose={handleClose}
+                        sx={{
+                           "& .MuiPaper-root":  {
+                              background: 'var(--color-background2)'
+                           }
+                        }}
                      >
                         <MenuItem onClick={handleLogout}>Logout</MenuItem>
                      </Menu>
