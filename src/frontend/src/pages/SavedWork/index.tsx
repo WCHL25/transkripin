@@ -1,73 +1,8 @@
 import WorkCard from "@/components/WorkCard";
+import { works } from "@/data/work";
 import { Box, Button, Tab, Tabs } from "@mui/material";
 import { useState } from "react";
 import { MdChevronRight, MdFilterAlt, MdSearch, MdSort } from "react-icons/md";
-
-export interface Work {
-   id: number;
-   type: "video" | "audio";
-   title: string;
-   date: string;
-   description: string;
-   visibility: "public" | "private";
-}
-
-const works: Work[] = [
-   {
-      id: 1,
-      type: "video",
-      title: "Team Meeting - Q4 Planning",
-      date: "Aug 25, 2024",
-      description:
-         "Quarterly planning discussion covering project roadmaps, budget allocations, and team restructuring for the upcoming quarter.",
-      visibility: "public",
-   },
-   {
-      id: 2,
-      type: "audio",
-      title: "Team Meeting - Q4 Planning",
-      date: "Aug 25, 2024",
-      description:
-         "Quarterly planning discussion covering project roadmaps, budget allocations, and team restructuring for the upcoming quarter.",
-      visibility: "public",
-   },
-   {
-      id: 3,
-      type: "video",
-      title: "Team Meeting - Q4 Planning",
-      date: "Aug 25, 2024",
-      description:
-         "Quarterly planning discussion covering project roadmaps, budget allocations, and team restructuring for the upcoming quarter.",
-      visibility: "public",
-   },
-   {
-      id: 4,
-      type: "video",
-      title: "Team Meeting - Q4 Planning",
-      date: "Aug 25, 2024",
-      description:
-         "Quarterly planning discussion covering project roadmaps, budget allocations, and team restructuring for the upcoming quarter.",
-      visibility: "public",
-   },
-   {
-      id: 5,
-      type: "video",
-      title: "Team Meeting - Q4 Planning",
-      date: "Aug 25, 2024",
-      description:
-         "Quarterly planning discussion covering project roadmaps, budget allocations, and team restructuring for the upcoming quarter.",
-      visibility: "public",
-   },
-   {
-      id: 6,
-      type: "video",
-      title: "Team Meeting - Q4 Planning",
-      date: "Aug 25, 2024",
-      description:
-         "Quarterly planning discussion covering project roadmaps, budget allocations, and team restructuring for the upcoming quarter.",
-      visibility: "public",
-   },
-];
 
 const SavedWork = () => {
    const [value, setValue] = useState(0);
@@ -78,7 +13,7 @@ const SavedWork = () => {
 
    return (
       <Box
-         component={"main"}
+         component="main"
          className="px-5 pt-36 pb-20 container mx-auto relative overflow-hidden"
       >
          <Box className="flex items-center justify-between gap-5 mb-6">

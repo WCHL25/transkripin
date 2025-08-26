@@ -1,13 +1,14 @@
-import { Work } from "@/pages/SavedWork";
+import { Work } from "@/data/work";
 import { Box, Button, IconButton } from "@mui/material";
-import { MdAudiotrack, MdPublic, MdShare, MdVideocam } from "react-icons/md";
+import { MdAudiotrack, MdBookmarkBorder, MdPublic, MdShare, MdVideocam } from "react-icons/md";
 import { Link } from "react-router-dom";
 
 interface Props {
    work: Work;
+   showSave?: boolean
 }
 
-const WorkCard = ({ work }: Props) => {
+const WorkCard = ({ work, showSave = false }: Props) => {
    return (
       <Box className="p-5 rounded-[10px] bg-background border border-background3 flex flex-col gap-5">
          <Box className="flex justify-between items-center gap-2">
@@ -29,7 +30,10 @@ const WorkCard = ({ work }: Props) => {
             <MdPublic className="text-2xl" />
          </Box>
          <p className="text-foreground2">{work.description}</p>
-         <Box className="flex justify-end gap-5 items-center">
+         <Box className="flex justify-end gap-4 items-center">
+            {showSave && <IconButton>
+               <MdBookmarkBorder className="text-foreground" />
+            </IconButton>}
             <IconButton>
                <MdShare className="text-foreground" />
             </IconButton>
