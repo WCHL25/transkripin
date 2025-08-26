@@ -247,7 +247,7 @@ const Home = () => {
          const url = URL.createObjectURL(file)
          setVideoUrl(url);
 
-         navigate(`/saved/${fileId}`, {
+         navigate(`/works/${fileId}`, {
             state: {
                videoUrl: url,
                summary: finalResult,
