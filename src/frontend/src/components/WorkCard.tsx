@@ -5,10 +5,10 @@ import { Link } from "react-router-dom";
 
 interface Props {
    work: Work;
-   showSave?: boolean
+   isExplore?: boolean
 }
 
-const WorkCard = ({ work, showSave = false }: Props) => {
+const WorkCard = ({ work, isExplore = false }: Props) => {
    return (
       <Box className="p-5 rounded-[10px] bg-background border border-background3 flex flex-col gap-5">
          <Box className="flex justify-between items-center gap-2">
@@ -27,11 +27,11 @@ const WorkCard = ({ work, showSave = false }: Props) => {
                </Box>
             </Box>
 
-            <MdPublic className="text-2xl" />
+            {!isExplore && <MdPublic className="text-2xl" />}
          </Box>
          <p className="text-foreground2">{work.description}</p>
          <Box className="flex justify-end gap-4 items-center">
-            {showSave && <IconButton>
+            {isExplore && <IconButton>
                <MdBookmarkBorder className="text-foreground" />
             </IconButton>}
             <IconButton>

@@ -1,9 +1,24 @@
 import WorkCard from "@/components/WorkCard";
+import { languageOptions, typeOptions } from "@/data/options";
 import { works } from "@/data/work";
-import { Box, Button } from "@mui/material";
-import { MdChevronRight, MdSearch } from "react-icons/md";
+import { Box, Button, ListItemText, Menu, MenuItem } from "@mui/material";
+import { useState } from "react";
+import { MdCheck, MdChevronRight, MdSearch } from "react-icons/md";
 
 const Explore = () => {
+   const [qs, setQs] = useState({
+      search: "",
+      type: "",
+      language: "",
+   });
+   const [anchorTypeEl, setAnchorTypeEl] = useState<null | HTMLElement>(null);
+   const [anchorLanguageEl, setAnchorLanguageEl] = useState<null | HTMLElement>(
+      null
+   );
+
+   const openType = Boolean(anchorTypeEl);
+   const openLanguage = Boolean(anchorLanguageEl);
+
    return (
       <Box
          component="main"
@@ -19,28 +34,114 @@ const Explore = () => {
                type="text"
                className="rounded-full bg-white focus:outline outline-primary text-xl w-full px-7 py-3 max-w-[800px] mx-auto block text-background"
                placeholder="Search..."
+               value={qs.search}
+               onChange={(e) => setQs({ ...qs, search: e.target.value })}
             />
 
             <Box className="flex justify-center gap-4">
                <Button
                   className="bg-background border px-5 min-w-0 border-background3 p-2 flex gap-3 items-center rounded-full"
                   color="inherit"
+                  onClick={(e) => setAnchorTypeEl(e.currentTarget)}
                >
-                  Type
+                  {qs.type
+                     ? typeOptions.find((opt) => qs.type == opt.value)?.label
+                     : "Type"}
                   <MdChevronRight className="rotate-90 text-base" />
                </Button>
+
+               <Menu
+                  anchorEl={anchorTypeEl}
+                  open={openType}
+                  onClose={() => setAnchorTypeEl(null)}
+                  sx={{
+                     "& .MuiPaper-root": {
+                        background: "var(--color-background2)",
+                     },
+                  }}
+               >
+                  {typeOptions.map((opt) => (
+                     <MenuItem
+                        key={opt.label}
+                        onClick={() => {
+                           setQs({ ...qs, type: opt.value });
+                           setAnchorTypeEl(null);
+                        }}
+                     >
+                        <ListItemText
+                           sx={{
+                              "& .MuiTypography-root": { fontSize: "14px" },
+                           }}
+                        >
+                           {opt.label}
+                        </ListItemText>
+                        <Box className="ml-5">
+                           <MdCheck
+                              className={`${
+                                 qs.type == opt.value
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                              }`}
+                           />
+                        </Box>
+                     </MenuItem>
+                  ))}
+               </Menu>
+
                <Button
                   className="bg-background border px-5 min-w-0 border-background3 p-2 flex gap-3 items-center rounded-full"
                   color="inherit"
+                  onClick={(e) => setAnchorLanguageEl(e.currentTarget)}
                >
-                  Language
+                  {qs.language
+                     ? languageOptions.find((opt) => qs.language == opt.value)
+                          ?.label
+                     : "Language"}
                   <MdChevronRight className="rotate-90 text-base" />
                </Button>
+
+               <Menu
+                  anchorEl={anchorLanguageEl}
+                  open={openLanguage}
+                  onClose={() => setAnchorLanguageEl(null)}
+                  sx={{
+                     "& .MuiPaper-root": {
+                        background: "var(--color-background2)",
+                     },
+                  }}
+               >
+                  {languageOptions.map((opt) => (
+                     <MenuItem
+                        key={opt.label}
+                        onClick={() => {
+                           setQs({ ...qs, language: opt.value });
+                           setAnchorLanguageEl(null);
+                        }}
+                     >
+                        <ListItemText
+                           sx={{
+                              "& .MuiTypography-root": { fontSize: "14px" },
+                           }}
+                        >
+                           {opt.label}
+                        </ListItemText>
+                        <Box className="ml-5">
+                           <MdCheck
+                              className={`${
+                                 qs.language == opt.value
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                              }`}
+                           />
+                        </Box>
+                     </MenuItem>
+                  ))}
+               </Menu>
             </Box>
 
             <Box className="grid grid-cols-3 gap-4">
                {works.map((w) => (
-                  <WorkCard key={w.id} work={w} showSave />
+                  <WorkCard key={w.id} work={w} isExplore />
                ))}
             </Box>
          </Box>
