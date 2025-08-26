@@ -37,7 +37,7 @@ const WorkCard = ({ work, isExplore = false }: Props) => {
             <IconButton>
                <MdShare className="text-foreground" />
             </IconButton>
-            <Button variant="contained"><Link to={`/saved/${work.id}`}>View</Link></Button>
+            <Button variant="contained"><Link to={`/works/${work.id}`}>View</Link></Button>
          </Box>
       </Box>
    );

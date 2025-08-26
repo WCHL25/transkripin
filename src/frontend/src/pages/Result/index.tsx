@@ -1,8 +1,19 @@
-import { Box, IconButton, Tab, Tabs } from "@mui/material";
+import { Box, IconButton, Tab, Tabs, Tooltip } from "@mui/material";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import exampleVideo from "@/assets/video/example.mp4";
-import { MdChevronLeft, MdContentCopy, MdDelete, MdSearch, MdShare } from "react-icons/md";
+import {
+   MdChevronLeft,
+   MdContentCopy,
+   MdDelete,
+   MdSearch,
+   MdShare,
+} from "react-icons/md";
+import { useDebouncedCallback } from "use-debounce";
+import { useSnackbarStore } from "@/store/useSnackbarStore";
+import ModalDelete from "./components/ModalDelete";
+import { Work } from "@/data/work";
+import ModalShare from "./components/ModalShare";
 
 interface Transcript {
    second: string;
@@ -27,9 +38,13 @@ const Result = () => {
    const [selectedTab, setSelectedTab] = useState<"transcript" | "summary">(
       "transcript"
    );
+   const [openShare, setOpenShare] = useState<Work | null>(null);
+   const [openDelete, setOpenDelete] = useState<Work | null>(null);
+   const [isCopied, setIsCopied] = useState(false);
 
    const location = useLocation();
-   // const navigate = useNavigate()
+   const setSnackbar = useSnackbarStore((s) => s.setSnackbar);
+
    const { videoUrl, fileType, summary, transcript, title } =
       location.state || {};
 
@@ -43,6 +58,27 @@ const Result = () => {
       setSelectedTab(value);
    };
 
+   const debounced = useDebouncedCallback(() => {
+      setIsCopied(false);
+   }, 2000);
+
+   const handleCopy = async () => {
+      try {
+         await navigator.clipboard.writeText(
+            selectedTab == "summary" ? _summary : JSON.stringify(_transcript)
+         );
+
+         setIsCopied(true);
+
+         debounced();
+      } catch (error: any) {
+         console.error(error.message);
+         setSnackbar({
+            message: "Tautan gagal disalin. Silahkan salin manual",
+         });
+      }
+   };
+
    useEffect(() => {
       console.log(videoUrl);
       console.log(summary);
@@ -54,6 +90,8 @@ const Result = () => {
 
    return (
       <Box className="px-5 pt-28 pb-20 container mx-auto">
+         <ModalDelete open={openDelete} setOpen={setOpenDelete} />
+         <ModalShare open={openShare} setOpen={setOpenShare} />
          <Link
             to={"/saved"}
             className="flex gap-[2px] items-center text-primary font-bold mb-5 hover:underline"
@@ -69,10 +107,32 @@ const Result = () => {
             </Box>
 
             <Box className="flex gap-5 items-center">
-               <IconButton>
+               <IconButton
+                  onClick={() =>
+                     setOpenShare({
+                        id: 1,
+                        title: _title,
+                        date: "",
+                        description: "",
+                        type: "video",
+                        visibility: "public",
+                     })
+                  }
+               >
                   <MdShare className="text-2xl text-foreground" />
                </IconButton>
-               <IconButton>
+               <IconButton
+                  onClick={() =>
+                     setOpenDelete({
+                        id: 1,
+                        title: _title,
+                        date: "",
+                        description: "",
+                        type: "video",
+                        visibility: "public",
+                     })
+                  }
+               >
                   <MdDelete className="text-2xl text-foreground" />
                </IconButton>
             </Box>
@@ -116,9 +176,20 @@ const Result = () => {
                      <IconButton>
                         <MdSearch className="text-xl text-foreground2" />
                      </IconButton>
-                     <IconButton>
-                        <MdContentCopy className="text-xl text-foreground2" />
-                     </IconButton>
+                     <Tooltip
+                        title={
+                           (!isCopied ? "Copy " : "") +
+                           (selectedTab == "transcript"
+                              ? "Transcript"
+                              : "Summary") +
+                           (isCopied ? " copied" : "")
+                        }
+                        open={isCopied === true ? true : undefined}
+                     >
+                        <IconButton onClick={handleCopy}>
+                           <MdContentCopy className="text-xl text-foreground2" />
+                        </IconButton>
+                     </Tooltip>
                   </Box>
                   {selectedTab == "summary" ? (
                      <Box className="p-5">{_summary}</Box>

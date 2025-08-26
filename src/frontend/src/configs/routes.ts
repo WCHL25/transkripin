@@ -24,7 +24,7 @@ export const router = createBrowserRouter([
             }),
           },
           {
-            path: '/saved/:id',
+            path: '/works/:id',
             lazy: async () => ({
               Component: (await import("@/pages/Result")).default,
             }),
