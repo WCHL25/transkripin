@@ -51,20 +51,26 @@ thread_local! {
     );
 
     static TRANSCRIPTIONS: RefCell<
-        StableBTreeMap<String, String, VirtualMemory<DefaultMemoryImpl>>
+        StableBTreeMap<String, Transcription, VirtualMemory<DefaultMemoryImpl>>
     > = RefCell::new(
         StableBTreeMap::init(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_TRANSCRIPTIONS)))
+    );
+
+    static SUMMARIES: RefCell<
+        StableBTreeMap<String, Summary, VirtualMemory<DefaultMemoryImpl>>
+    > = RefCell::new(
+        StableBTreeMap::init(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_SUMMARIES)))
+    );
+
+    static FINAL_RESULTS: RefCell<
+        StableBTreeMap<String, FinalResult, VirtualMemory<DefaultMemoryImpl>>
+    > = RefCell::new(
+        StableBTreeMap::init(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_FINAL_RESULTS)))
     );
 
     static JOBS: RefCell<
         StableBTreeMap<String, String, VirtualMemory<DefaultMemoryImpl>>
     > = RefCell::new(StableBTreeMap::init(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_JOBS))));
-
-    static SUMMARIES: RefCell<
-        StableBTreeMap<String, Option<String>, VirtualMemory<DefaultMemoryImpl>>
-    > = RefCell::new(
-        StableBTreeMap::init(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_SUMMARIES)))
-    );
 }
 
 #[init]

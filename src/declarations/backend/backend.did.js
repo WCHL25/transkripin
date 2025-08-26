@@ -10,6 +10,27 @@ export const idlFactory = ({ IDL }) => {
     'uploaded_at' : IDL.Nat64,
   });
   const Result_1 = IDL.Variant({ 'Ok' : UploadedFile, 'Err' : IDL.Text });
+  const Summary = IDL.Record({
+    'text' : IDL.Text,
+    'created_at' : IDL.Nat64,
+    'file_id' : IDL.Text,
+  });
+  const Transcription = IDL.Record({
+    'text' : IDL.Text,
+    'created_at' : IDL.Nat64,
+    'job_id' : IDL.Text,
+    'file_id' : IDL.Text,
+  });
+  const FinalResult = IDL.Record({
+    'owner' : IDL.Principal,
+    'size' : IDL.Nat64,
+    'content_type' : IDL.Text,
+    'filename' : IDL.Text,
+    'summary' : IDL.Opt(Summary),
+    'transcription' : IDL.Opt(Transcription),
+    'uploaded_at' : IDL.Nat64,
+    'file_id' : IDL.Text,
+  });
   const JobStatus = IDL.Variant({
     'Failed' : IDL.Text,
     'Completed' : IDL.Text,
@@ -35,6 +56,11 @@ export const idlFactory = ({ IDL }) => {
     'complete_upload' : IDL.Func([IDL.Text], [Result], []),
     'delete_file' : IDL.Func([IDL.Text], [Result], []),
     'get_file' : IDL.Func([IDL.Text], [Result_1], ['query']),
+    'get_final_result' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(FinalResult)],
+        ['query'],
+      ),
     'get_summary_result' : IDL.Func([IDL.Text], [Result], ['query']),
     'get_transcription' : IDL.Func([IDL.Text], [Result], ['query']),
     'get_transcription_result' : IDL.Func([IDL.Text], [Result], []),
@@ -46,6 +72,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text, IDL.Text, IDL.Nat64))],
         ['query'],
       ),
+    'list_user_final_results' : IDL.Func([], [IDL.Vec(FinalResult)], ['query']),
     'login' : IDL.Func([], [IDL.Text], []),
     'logout' : IDL.Func([], [IDL.Text], []),
     'start_summarization' : IDL.Func([IDL.Text], [Result], []),
