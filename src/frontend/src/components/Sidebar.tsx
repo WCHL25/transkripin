@@ -54,13 +54,17 @@ const Sidebar = () => {
                   </ListItemButton>
                </ListItem>
 
-               {menu.map(
-                  (m) =>
+               {menu.map((m) => {
+                  const isActive =
+                     m.link == "/"
+                        ? pathname == m.link
+                        : pathname.startsWith(m.link);
+                  return (
                      ((m.isProtected && isAuthenticated) || !m.isProtected) && (
                         <ListItem key={m.label} disablePadding>
                            <ListItemButton
                               className={`py-[6px] px-[12px] rounded-[10px] flex flex-col gap-[2px] items-center ${
-                                 pathname == m.link ? "bg-primary/5" : ""
+                                 isActive ? "bg-primary/5" : ""
                               }`}
                               onClick={() => navigate(m.link)}
                               title={m.label}
@@ -68,7 +72,7 @@ const Sidebar = () => {
                               <ListItemIcon className="min-w-0 w-fit">
                                  <m.icon
                                     className={`text-2xl ${
-                                       pathname == m.link
+                                       isActive
                                           ? "text-primary"
                                           : "text-foreground2"
                                     }`}
@@ -79,10 +83,9 @@ const Sidebar = () => {
                                  sx={{
                                     margin: 0,
                                     "& .MuiTypography-root": {
-                                       color:
-                                          pathname == m.link
-                                             ? "var(--color-primary)"
-                                             : "var(--color-foreground2)",
+                                       color: isActive
+                                          ? "var(--color-primary)"
+                                          : "var(--color-foreground2)",
                                        fontSize: "11px",
                                        fontWeight: "bold",
                                     },
@@ -91,7 +94,8 @@ const Sidebar = () => {
                            </ListItemButton>
                         </ListItem>
                      )
-               )}
+                  );
+               })}
             </List>
          </Drawer>
       </Box>
