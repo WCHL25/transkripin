@@ -1,3 +1,13 @@
+type FinalResult = record {
+  owner : principal;
+  size : nat64;
+  content_type : text;
+  filename : text;
+  summary : opt Summary;
+  transcription : opt Transcription;
+  uploaded_at : nat64;
+  file_id : text;
+};
 type JobStatus = variant { Failed : text; Completed : text; Pending };
 type Result = variant { Ok : text; Err : text };
 type Result_1 = variant { Ok : UploadedFile; Err : text };
@@ -8,6 +18,13 @@ type StartUploadRequest = record {
   content_type : text;
   total_size : nat64;
   filename : text;
+};
+type Summary = record { "text" : text; created_at : nat64; file_id : text };
+type Transcription = record {
+  "text" : text;
+  created_at : nat64;
+  job_id : text;
+  file_id : text;
 };
 type UploadChunkRequest = record {
   chunk_index : nat64;
@@ -27,6 +44,8 @@ service : () -> {
   complete_upload : (text) -> (Result);
   delete_file : (text) -> (Result);
   get_file : (text) -> (Result_1) query;
+  // Query a final result
+  get_final_result : (text) -> (opt FinalResult) query;
   get_summary_result : (text) -> (Result) query;
   get_transcription : (text) -> (Result) query;
   get_transcription_result : (text) -> (Result);
@@ -34,6 +53,8 @@ service : () -> {
   get_upload_status : (text) -> (Result_3) query;
   get_user_id : (principal) -> (text) query;
   list_files : () -> (vec record { text; text; text; nat64 }) query;
+  // List all final results for the current caller
+  list_user_final_results : () -> (vec FinalResult) query;
   login : () -> (text);
   logout : () -> (text);
   start_summarization : (text) -> (Result);

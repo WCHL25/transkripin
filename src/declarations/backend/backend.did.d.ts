@@ -2,6 +2,16 @@ import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
+export interface FinalResult {
+  'owner' : Principal,
+  'size' : bigint,
+  'content_type' : string,
+  'filename' : string,
+  'summary' : [] | [Summary],
+  'transcription' : [] | [Transcription],
+  'uploaded_at' : bigint,
+  'file_id' : string,
+}
 export type JobStatus = { 'Failed' : string } |
   { 'Completed' : string } |
   { 'Pending' : null };
@@ -18,6 +28,17 @@ export interface StartUploadRequest {
   'content_type' : string,
   'total_size' : bigint,
   'filename' : string,
+}
+export interface Summary {
+  'text' : string,
+  'created_at' : bigint,
+  'file_id' : string,
+}
+export interface Transcription {
+  'text' : string,
+  'created_at' : bigint,
+  'job_id' : string,
+  'file_id' : string,
 }
 export interface UploadChunkRequest {
   'chunk_index' : bigint,
@@ -37,6 +58,7 @@ export interface _SERVICE {
   'complete_upload' : ActorMethod<[string], Result>,
   'delete_file' : ActorMethod<[string], Result>,
   'get_file' : ActorMethod<[string], Result_1>,
+  'get_final_result' : ActorMethod<[string], [] | [FinalResult]>,
   'get_summary_result' : ActorMethod<[string], Result>,
   'get_transcription' : ActorMethod<[string], Result>,
   'get_transcription_result' : ActorMethod<[string], Result>,
@@ -44,6 +66,7 @@ export interface _SERVICE {
   'get_upload_status' : ActorMethod<[string], Result_3>,
   'get_user_id' : ActorMethod<[Principal], string>,
   'list_files' : ActorMethod<[], Array<[string, string, string, bigint]>>,
+  'list_user_final_results' : ActorMethod<[], Array<FinalResult>>,
   'login' : ActorMethod<[], string>,
   'logout' : ActorMethod<[], string>,
   'start_summarization' : ActorMethod<[string], Result>,

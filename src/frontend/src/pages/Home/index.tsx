@@ -208,14 +208,13 @@ const Home = () => {
 
       const startSummaryJob = await backend.start_summarization(fileId);
       if ("Err" in startSummaryJob) throw new Error(startSummaryJob.Err);
-      const summaryJobId = startSummaryJob.Ok;
 
       // Optimized polling for summary
       pollInterval = 1000; // Reset to 1 second for summary
       let finalResult: string | null = null;
 
       while (true) {
-        const summaryResult = await backend.get_summary_result(summaryJobId);
+        const summaryResult = await backend.get_summary_result(fileId);
 
         if ("Ok" in summaryResult) {
           finalResult = summaryResult.Ok;
@@ -226,6 +225,7 @@ const Home = () => {
         pollInterval = Math.min(pollInterval * 1.1, 5000); // Max 5 seconds for summary
       }
 
+      console.log("Summary result", finalResult);
       console.log("Summary completed");
 
       setUploadProgress(100);
