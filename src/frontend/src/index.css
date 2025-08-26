@@ -4,13 +4,16 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-background: #151b29;
-  --color-background2: #1e2337;
+  --color-background: #151B29;
+  --color-background2: #1E2337;
+  --color-background3: #303650;
   --color-foreground: #FDFDFD;
+  --color-foreground2: #C6C6C6;
   --color-primary: #1A84DB;
+
   --font-nunito: "Nunito", sans-serif;
 }
 
 body {
-    @apply font-nunito text-sm text-foreground bg-background;
+  @apply font-nunito text-sm text-foreground bg-background;
 }
