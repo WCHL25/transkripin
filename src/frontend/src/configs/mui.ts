@@ -1,14 +1,23 @@
 import { createTheme } from "@mui/material";
 
 const theme = createTheme({
-    typography: {
-        fontFamily: '"Nunito", sans-serif',
-        allVariants: {
-            textTransform: 'none',
-        },
-    },
-    palette: {
-      mode: 'dark',
+   typography: {
+      fontFamily: '"Nunito", sans-serif',
+      allVariants: {
+         textTransform: "none",
+      },
+      body1: {
+         fontSize: "14px",
+      },
+      body2: {
+         fontSize: "14px",
+      },
+      caption: {
+         fontSize: '12px',
+      }
+   },
+   palette: {
+      mode: "dark",
       primary: {
          light: "#278ee3",
          main: "#1A84DB",
@@ -21,7 +30,7 @@ const theme = createTheme({
          dark: "#171c2e",
          contrastText: "#FDFDFD",
       },
-   }
-})
+   },
+});
 
 export default theme;
