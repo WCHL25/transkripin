@@ -222,6 +222,7 @@ const Home = () => {
          let finalResult: string | null = null;
 
          while (true) {
+            console.log("Trying to get summary...");
             const summaryResult = await backend.get_summary_result(fileId);
 
             if ("Ok" in summaryResult) {
@@ -244,7 +245,7 @@ const Home = () => {
             message: "File processed successfully!",
          });
 
-         const url = URL.createObjectURL(file)
+         const url = URL.createObjectURL(file);
          setVideoUrl(url);
 
          navigate(`/works/${fileId}`, {

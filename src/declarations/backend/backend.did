@@ -44,6 +44,7 @@ service : () -> {
   complete_upload : (text) -> (Result);
   delete_file : (text) -> (Result);
   get_file : (text) -> (Result_1) query;
+  // Query a final result
   get_final_result : (text) -> (opt FinalResult) query;
   get_summary_result : (text) -> (Result) query;
   get_transcription : (text) -> (Result) query;
@@ -52,6 +53,7 @@ service : () -> {
   get_upload_status : (text) -> (Result_3) query;
   get_user_id : (principal) -> (text) query;
   list_files : () -> (vec record { text; text; text; nat64 }) query;
+  // List all final results for the current caller
   list_user_final_results : () -> (vec FinalResult) query;
   login : () -> (text);
   logout : () -> (text);

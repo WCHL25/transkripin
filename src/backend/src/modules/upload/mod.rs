@@ -1,17 +1,10 @@
-use ic_cdk::{
-    api::management_canister::http_request::{
-        http_request,
-        CanisterHttpRequestArgument,
-        HttpMethod,
-        HttpResponse,
-    },
-    query,
-    update,
-};
+use ic_cdk::{ query, update };
 
 pub mod domain;
+pub mod service;
 
 pub use domain::*;
+pub use service::*;
 
 use crate::{
     common::*,
@@ -233,73 +226,31 @@ pub fn get_transcription(file_id: String) -> Result<String, String> {
 
 #[update]
 pub async fn get_transcription_status(job_id: String) -> Result<JobStatus, String> {
-    let response_size = 2_000_000u64;
-    let cycles = 400_000_000 + (0 + response_size) * 600_000;
-
-    let status_req = CanisterHttpRequestArgument {
-        url: format!("{}/status/{}", TRANSCRIPTION_URL, job_id),
-        method: HttpMethod::GET,
-        headers: vec![],
-        body: None,
-        max_response_bytes: Some(response_size),
-        transform: None,
-    };
-
-    let (status_res,): (HttpResponse,) = http_request(status_req, cycles.into()).await.map_err(|e| {
-        format!("Status request failed: {:?}", e)
-    })?;
-
-    let status_str = String::from_utf8(status_res.body).map_err(|_|
-        "Invalid UTF-8 in status response".to_string()
-    )?;
-
-    // Deserialize JSON directly into JobStatus
-    let parsed: JobStatus = serde_json
-        ::from_str(&status_str)
-        .map_err(|e| format!("Invalid JSON: {:?}", e))?;
-
-    Ok(parsed)
+    fetch_transcription_api(&job_id, "status", |status_str| {
+        serde_json::from_str(&status_str).map_err(|e| format!("Invalid JSON: {:?}", e))
+    }).await
 }
 
 #[update]
 pub async fn get_transcription_result(job_id: String) -> Result<String, String> {
-    let response_size = 2_000_000u64;
-    let cycles = 400_000_000 + (0 + response_size) * 600_000;
-
-    let result_req = CanisterHttpRequestArgument {
-        url: format!("{}/result/{}", TRANSCRIPTION_URL, job_id),
-        method: HttpMethod::GET,
-        headers: vec![],
-        body: None,
-        max_response_bytes: Some(response_size),
-        transform: None,
-    };
-
-    let (result_res,): (HttpResponse,) = http_request(result_req, cycles.into()).await.map_err(|e| {
-        format!("Result request failed: {:?}", e)
-    })?;
-
-    let result_str = String::from_utf8(result_res.body).map_err(|_|
-        "Invalid UTF-8 in result response".to_string()
-    )?;
-
-    // Find matching file_id
-    if let Some(file_id) = JOBS.with(|jobs| jobs.borrow().get(&job_id)) {
-        TRANSCRIPTIONS.with(|map| {
-            let file_id_clone = file_id.clone();
-
-            map.borrow_mut().insert(file_id_clone, Transcription {
-                job_id: job_id.clone(),
-                file_id: file_id.clone(),
-                text: result_str.clone(),
-                created_at: ic_cdk::api::time(),
+    fetch_transcription_api(&job_id, "result", |result_str| {
+        // Insert into TRANSCRIPTIONS map if job_id exists
+        if let Some(file_id) = JOBS.with(|jobs| jobs.borrow().get(&job_id)) {
+            TRANSCRIPTIONS.with(|map| {
+                let file_id_clone = file_id.clone();
+                map.borrow_mut().insert(file_id_clone, Transcription {
+                    job_id: job_id.clone(),
+                    file_id: file_id.clone(),
+                    text: result_str.clone(),
+                    created_at: ic_cdk::api::time(),
+                });
             });
-        });
-    } else {
-        return Err("No file ID found for this job ID".to_string());
-    }
+        } else {
+            return Err("No file ID found for this job ID".to_string());
+        }
 
-    Ok(result_str)
+        Ok(result_str)
+    }).await
 }
 
 /* Summarization */
@@ -352,15 +303,16 @@ fn save_final_result(
     transcription: Option<Transcription>,
     summary: Option<Summary>
 ) {
-    let file = &file_id.to_string();
-    let maybe_file = UPLOADED_FILES.with(|files| files.borrow().get(file));
-    if let Some(f) = maybe_file {
+    let file_id = &file_id.to_string();
+    let uploaded_file = UPLOADED_FILES.with(|files| files.borrow().get(file_id));
+
+    if let Some(f) = uploaded_file {
         let final_result = FinalResult {
             file_id: f.id.clone(),
+            owner: f.owner.clone(),
             filename: f.filename.clone(),
             content_type: f.content_type.clone(),
             size: f.size,
-            owner: f.owner.clone(),
             uploaded_at: f.uploaded_at,
             transcription: transcription,
             summary: summary,
