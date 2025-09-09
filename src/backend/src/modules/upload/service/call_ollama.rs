@@ -40,7 +40,7 @@ pub async fn call_ollama(prompt: String) -> Result<String, String> {
         format!("Failed to connect to Ollama: {:?} - {}", r, m)
     )?;
 
-    if response.status != candid::Nat::from(200usize) {
+    if response.status != candid::Nat::from(200u32) {
         return Err(format!("Ollama API error: {}", response.status));
     }
 
