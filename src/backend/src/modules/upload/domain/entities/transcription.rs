@@ -9,6 +9,7 @@ pub struct Transcription {
     pub file_id: String,
     pub text: String,
     pub created_at: u64,
+    pub deleted_at: Option<u64>,
 }
 
 impl_storable!(Transcription);

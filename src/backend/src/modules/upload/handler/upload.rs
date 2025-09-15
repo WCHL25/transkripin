@@ -15,7 +15,7 @@ use crate::{
 /* UPLOAD HANDLERS */
 #[update]
 pub fn start_upload(request: StartUploadRequest) -> Result<String, String> {
-    let caller = ic_cdk::api::caller();
+    let owner = ic_cdk::api::caller();
 
     // Validate file size (max 100MB)
     if request.total_size > 100 * 1024 * 1024 {
@@ -36,8 +36,9 @@ pub fn start_upload(request: StartUploadRequest) -> Result<String, String> {
         total_size: request.total_size,
         total_chunks: request.total_chunks,
         uploaded_chunks: Vec::with_capacity(request.total_chunks as usize),
-        owner: caller,
+        owner: owner,
         created_at: created_at,
+        deleted_at: None,
     };
 
     UPLOAD_SESSIONS.with(|sessions| sessions.borrow_mut().insert(session_id.clone(), session));
@@ -111,7 +112,7 @@ pub async fn complete_upload(session_id: String) -> Result<String, String> {
                 }
 
                 let file_id = generate_id();
-                let uploaded_at = ic_cdk::api::time();
+                let created_at = ic_cdk::api::time();
 
                 Ok(UploadedFile {
                     id: file_id,
@@ -120,7 +121,8 @@ pub async fn complete_upload(session_id: String) -> Result<String, String> {
                     size: session.total_size,
                     data: file_data,
                     owner: caller,
-                    uploaded_at: uploaded_at,
+                    created_at: created_at,
+                    deleted_at: None,
                 })
             }
             None => Err("Upload session not found".to_string()),

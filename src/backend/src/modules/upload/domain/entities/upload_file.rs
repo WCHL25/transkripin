@@ -11,7 +11,8 @@ pub struct UploadedFile {
     pub size: u64,
     pub data: Vec<u8>,
     pub owner: Principal,
-    pub uploaded_at: u64,
+    pub created_at: u64,
+    pub deleted_at: Option<u64>,
 }
 
 impl_storable!(UploadedFile);

@@ -164,8 +164,9 @@ const Home = () => {
          setUploadProgress(80);
 
          const startTranscribeJob = await backend.start_transcription(fileId);
-         if ("Err" in startTranscribeJob)
+         if ("Err" in startTranscribeJob) {
             throw new Error(startTranscribeJob.Err);
+         }
          const transcribeJobId = startTranscribeJob.Ok;
 
          // Optimized polling with exponential backoff
@@ -207,8 +208,9 @@ const Home = () => {
          );
          console.log("Transcription result:", transcriptionResult);
 
-         if ("Err" in transcriptionResult)
+         if ("Err" in transcriptionResult) {
             throw new Error(transcriptionResult.Err);
+         }
 
          // Start summarization
          console.log("Starting summarization...");
@@ -219,14 +221,18 @@ const Home = () => {
 
          // Optimized polling for summary
          pollInterval = 1000; // Reset to 1 second for summary
-         let finalResult: string | null = null;
+         let fileArtifact: string | null = null;
 
          while (true) {
             console.log("Trying to get summary...");
             const summaryResult = await backend.get_summary_result(fileId);
-
+            console.log("Summary result:", summaryResult);
             if ("Ok" in summaryResult) {
-               finalResult = summaryResult.Ok;
+               fileArtifact = summaryResult.Ok;
+               if (fileArtifact.startsWith("Err")) {
+                  console.error(fileArtifact);
+                  break;
+               }
                break;
             }
 
@@ -234,12 +240,12 @@ const Home = () => {
             pollInterval = Math.min(pollInterval * 1.1, 5000); // Max 5 seconds for summary
          }
 
-         console.log("Summary result", finalResult);
+         console.log("Summary result", fileArtifact);
          console.log("Summary completed");
 
          setUploadProgress(100);
          setUploadStatus("complete");
-         setResult(finalResult!);
+         setResult(fileArtifact!);
 
          setSnackbar({
             message: "File processed successfully!",
@@ -251,7 +257,7 @@ const Home = () => {
          navigate(`/works/${fileId}`, {
             state: {
                videoUrl: url,
-               summary: finalResult,
+               summary: fileArtifact,
                filename: file.name,
                fileSize: file.size,
                fileType: file.type,

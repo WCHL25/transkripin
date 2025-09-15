@@ -5,7 +5,8 @@ pub mod upload_chunk_request;
 pub mod upload_file;
 pub mod upload_session;
 pub mod job_status;
-pub mod final_result;
+pub mod llm_response;
+pub mod file_artifact;
 
 pub use start_upload_request::*;
 pub use summary::*;
@@ -14,4 +15,5 @@ pub use upload_chunk_request::*;
 pub use upload_file::*;
 pub use upload_session::*;
 pub use job_status::*;
-pub use final_result::*;
+pub use llm_response::*;
+pub use file_artifact::*;

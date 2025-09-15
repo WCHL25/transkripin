@@ -13,6 +13,7 @@ pub struct UploadSession {
     pub uploaded_chunks: Vec<Vec<u8>>,
     pub owner: Principal,
     pub created_at: u64,
+    pub deleted_at: Option<u64>,
 }
 
 impl_storable!(UploadSession);
