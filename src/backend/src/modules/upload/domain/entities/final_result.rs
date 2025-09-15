@@ -1,7 +1,7 @@
 use candid::{ CandidType, Principal };
 use serde::{ Deserialize, Serialize };
 
-use crate::{ impl_storable, modules::{ upload::domain::entities::Transcription, Summary } };
+use crate::{ impl_storable, modules::upload::domain::entities::{ Transcription, Summary } };
 
 #[derive(Clone, Debug, CandidType, Deserialize, Serialize)]
 pub struct FinalResult {
