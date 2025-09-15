@@ -32,6 +32,7 @@ pub fn start_upload(request: StartUploadRequest) -> Result<String, String> {
     }
 
     let session_id = generate_id();
+    let created_at = ic_cdk::api::time();
     let session = UploadSession {
         id: session_id.clone(),
         filename: request.filename,
@@ -40,7 +41,7 @@ pub fn start_upload(request: StartUploadRequest) -> Result<String, String> {
         total_chunks: request.total_chunks,
         uploaded_chunks: Vec::with_capacity(request.total_chunks as usize),
         owner: caller,
-        created_at: ic_cdk::api::time(),
+        created_at: created_at,
     };
 
     UPLOAD_SESSIONS.with(|sessions| sessions.borrow_mut().insert(session_id.clone(), session));
@@ -114,6 +115,8 @@ pub async fn complete_upload(session_id: String) -> Result<String, String> {
                 }
 
                 let file_id = generate_id();
+                let uploaded_at = ic_cdk::api::time();
+
                 Ok(UploadedFile {
                     id: file_id,
                     filename: session.filename,
@@ -121,7 +124,7 @@ pub async fn complete_upload(session_id: String) -> Result<String, String> {
                     size: session.total_size,
                     data: file_data,
                     owner: caller,
-                    uploaded_at: ic_cdk::api::time(),
+                    uploaded_at: uploaded_at,
                 })
             }
             None => Err("Upload session not found".to_string()),
@@ -238,11 +241,13 @@ pub async fn get_transcription_result(job_id: String) -> Result<String, String> 
         if let Some(file_id) = JOBS.with(|jobs| jobs.borrow().get(&job_id)) {
             TRANSCRIPTIONS.with(|map| {
                 let file_id_clone = file_id.clone();
+                let created_at = ic_cdk::api::time();
+
                 map.borrow_mut().insert(file_id_clone, Transcription {
                     job_id: job_id.clone(),
                     file_id: file_id.clone(),
                     text: result_str.clone(),
-                    created_at: ic_cdk::api::time(),
+                    created_at: created_at,
                 });
             });
         } else {
@@ -266,13 +271,14 @@ pub async fn start_summarization(file_id: String) -> Result<String, String> {
                 ic_cdk::println!("Prompt:{}", prompt);
 
                 let summarization = call_ollama(prompt).await;
+                let created_at = ic_cdk::api::time();
 
                 match summarization {
                     Ok(text) => {
                         let summary = Summary {
                             file_id: file_id_clone.clone(),
                             text: text,
-                            created_at: ic_cdk::api::time(),
+                            created_at: created_at,
                         };
 
                         SUMMARIES.with(|map| {
@@ -296,32 +302,6 @@ pub fn get_summary_result(file_id: String) -> Result<String, String> {
     SUMMARIES.with(|map| map.borrow().get(&file_id))
         .map(|s| s.text.clone())
         .ok_or_else(|| "Summary not ready".to_string())
-}
-
-fn save_final_result(
-    file_id: &str,
-    transcription: Option<Transcription>,
-    summary: Option<Summary>
-) {
-    let file_id = &file_id.to_string();
-    let uploaded_file = UPLOADED_FILES.with(|files| files.borrow().get(file_id));
-
-    if let Some(f) = uploaded_file {
-        let final_result = FinalResult {
-            file_id: f.id.clone(),
-            owner: f.owner.clone(),
-            filename: f.filename.clone(),
-            content_type: f.content_type.clone(),
-            size: f.size,
-            uploaded_at: f.uploaded_at,
-            transcription: transcription,
-            summary: summary,
-        };
-
-        FINAL_RESULTS.with(|map| {
-            map.borrow_mut().insert(file_id.to_string(), final_result);
-        });
-    }
 }
 
 /// Query a final result
