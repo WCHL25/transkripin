@@ -43,7 +43,7 @@ pub async fn whisper_transcribe(video_data: Vec<u8>) -> Result<String> {
 
     let pcm = extract_chunks(&audio_wav);
 
-    let path_to_model = "src/transcribe/assets/models/ggml-base.en.bin";
+    let path_to_model = "src/transcribe/assets/models/ggml-base.bin";
     let ctx = WhisperContext::new_with_params(
         path_to_model,
         WhisperContextParameters::default()
@@ -54,7 +54,7 @@ pub async fn whisper_transcribe(video_data: Vec<u8>) -> Result<String> {
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
     params.set_n_threads(4);
     params.set_translate(false);
-    params.set_language(Some("en"));
+    params.set_language(None);
 
     state.full(params, &pcm).map_err(|e| anyhow!("Transcription failed: {}", e))?;
 
