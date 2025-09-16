@@ -7,7 +7,7 @@ use tokio::task;
 
 mod modules;
 
-use modules::whisper;
+use modules::*;
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(tag = "status", content = "data")]
@@ -19,16 +19,6 @@ enum JobStatus {
 
 static JOBS: Lazy<Mutex<HashMap<String, JobStatus>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
-#[derive(Serialize)]
-pub struct UploadResponse {
-    message: String,
-}
-
-#[derive(Serialize)]
-pub struct TranscriptionResponse {
-    text: String,
-}
-
 static UPLOAD_SESSIONS: Lazy<Arc<Mutex<HashMap<String, Vec<Vec<u8>>>>>> = Lazy::new(||
     Arc::new(Mutex::new(HashMap::new()))
 );
@@ -38,8 +28,8 @@ async fn main() {
     let app = Router::new()
         .route("/upload_chunk", post(upload_chunk))
         .route("/finalize_upload", post(finalize_upload))
-        .route("/status/{job_id}", get(check_status))
-        .route("/result/{job_id}", get(get_result))
+        .route("/status/{job_id}", get(check_job_status))
+        .route("/result/{job_id}", get(transcription_result))
         .layer(TimeoutLayer::new(Duration::from_secs(120)));
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
@@ -114,9 +104,12 @@ pub async fn finalize_upload(Json(data): Json<serde_json::Value>) -> Json<Upload
 
         // now safe to await
         match whisper::whisper_transcribe(combined).await {
-            Ok(text) => {
+            Ok(result) => {
                 let mut jobs = JOBS.lock().unwrap();
-                jobs.insert(job_id_clone, JobStatus::Completed(text));
+                jobs.insert(
+                    job_id_clone,
+                    JobStatus::Completed(serde_json::to_string(&result).unwrap())
+                );
             }
             Err(e) => {
                 let mut jobs = JOBS.lock().unwrap();
@@ -133,8 +126,8 @@ pub async fn finalize_upload(Json(data): Json<serde_json::Value>) -> Json<Upload
     })
 }
 
-async fn check_status(Path(job_id): Path<String>) -> Json<JobStatus> {
-    let jobs = JOBS.lock().unwrap();
+async fn check_job_status(Path(job_id): Path<String>) -> Json<JobStatus> {
+    let jobs: std::sync::MutexGuard<'_, HashMap<String, JobStatus>> = JOBS.lock().unwrap();
 
     jobs.get(&job_id)
         .cloned()
@@ -142,13 +135,32 @@ async fn check_status(Path(job_id): Path<String>) -> Json<JobStatus> {
         .unwrap_or(Json(JobStatus::Failed("Job not found".to_string())))
 }
 
-async fn get_result(Path(job_id): Path<String>) -> Json<TranscriptionResponse> {
+async fn transcription_result(Path(job_id): Path<String>) -> Json<TranscriptionResponse> {
     let jobs = JOBS.lock().unwrap();
+
     match jobs.get(&job_id) {
-        Some(JobStatus::Completed(text)) => { Json(TranscriptionResponse { text: text.clone() }) }
-        Some(JobStatus::Failed(err)) => {
-            Json(TranscriptionResponse { text: format!("Error: {}", err) })
+        Some(JobStatus::Completed(result_json)) => {
+            // Deserialize stored JSON back into TranscriptionResponse
+            let result: TranscriptionResponse = serde_json
+                ::from_str(result_json)
+                .unwrap_or(TranscriptionResponse {
+                    text: "Failed to parse result".to_string(),
+                    language: "unknown".to_string(),
+                    segments: vec![],
+                });
+            Json(result)
         }
-        _ => Json(TranscriptionResponse { text: "Job is still pending.".to_string() }),
+        Some(JobStatus::Failed(err)) =>
+            Json(TranscriptionResponse {
+                text: format!("Error: {}", err),
+                language: "unknown".to_string(),
+                segments: vec![],
+            }),
+        _ =>
+            Json(TranscriptionResponse {
+                text: "Job is still pending.".to_string(),
+                language: "unknown".to_string(),
+                segments: vec![],
+            }),
     }
 }

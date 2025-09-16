@@ -15,6 +15,12 @@ export interface FileArtifact {
   'visibility' : FileArtifactVisibility,
   'file_id' : string,
 }
+export interface FileArtifactFilter {
+  'sort' : [] | [SortOrderFilter],
+  'search' : [] | [string],
+  'file_type' : [] | [FileTypeFilter],
+  'language' : [] | [LanguageFilter],
+}
 export interface FileArtifactRequest {
   'title' : [] | [string],
   'summary' : [] | [Summary],
@@ -23,12 +29,16 @@ export interface FileArtifactRequest {
 }
 export type FileArtifactVisibility = { 'Private' : null } |
   { 'Public' : null };
+export type FileTypeFilter = { 'Audio' : null } |
+  { 'Video' : null };
 export type JobStatus = { 'Failed' : string } |
   { 'Completed' : string } |
   { 'Pending' : null };
-export type Result = { 'Ok' : string } |
+export type LanguageFilter = { 'English' : null } |
+  { 'Indonesia' : null };
+export type Result = { 'Ok' : null } |
   { 'Err' : string };
-export type Result_1 = { 'Ok' : null } |
+export type Result_1 = { 'Ok' : string } |
   { 'Err' : string };
 export type Result_2 = { 'Ok' : FileArtifact } |
   { 'Err' : string };
@@ -38,6 +48,10 @@ export type Result_4 = { 'Ok' : JobStatus } |
   { 'Err' : string };
 export type Result_5 = { 'Ok' : [bigint, bigint] } |
   { 'Err' : string };
+export type SortOrderFilter = { 'Oldest' : null } |
+  { 'AlphabeticalDesc' : null } |
+  { 'AlphabeticalAsc' : null } |
+  { 'Newest' : null };
 export interface StartUploadRequest {
   'total_chunks' : bigint,
   'content_type' : string,
@@ -53,6 +67,7 @@ export interface Summary {
 export interface Transcription {
   'text' : string,
   'created_at' : bigint,
+  'language' : string,
   'job_id' : string,
   'deleted_at' : [] | [bigint],
   'file_id' : string,
@@ -73,27 +88,36 @@ export interface UploadedFile {
   'deleted_at' : [] | [bigint],
 }
 export interface _SERVICE {
-  'complete_upload' : ActorMethod<[string], Result>,
-  'delete_file' : ActorMethod<[string], Result>,
-  'delete_file_artifact' : ActorMethod<[string], Result_1>,
+  'add_bookmark' : ActorMethod<[string], Result>,
+  'complete_upload' : ActorMethod<[string], Result_1>,
+  'delete_file' : ActorMethod<[string], Result_1>,
+  'delete_file_artifact' : ActorMethod<[string], Result>,
   'edit_file_artifact' : ActorMethod<[FileArtifactRequest], Result_2>,
   'get_file' : ActorMethod<[string], Result_3>,
   'get_file_artifact' : ActorMethod<[string], [] | [FileArtifact]>,
-  'get_summary_result' : ActorMethod<[string], Result>,
-  'get_transcription' : ActorMethod<[string], Result>,
-  'get_transcription_result' : ActorMethod<[string], Result>,
+  'get_summary_result' : ActorMethod<[string], Result_1>,
+  'get_transcription' : ActorMethod<[string], Result_1>,
+  'get_transcription_result' : ActorMethod<[string], Result_1>,
   'get_transcription_status' : ActorMethod<[string], Result_4>,
   'get_upload_status' : ActorMethod<[string], Result_5>,
   'get_user_id' : ActorMethod<[Principal], string>,
   'list_files' : ActorMethod<[], Array<[string, string, string, bigint]>>,
-  'list_user_file_artifacts' : ActorMethod<[], Array<FileArtifact>>,
+  'list_saved_file_artifacts' : ActorMethod<
+    [[] | [FileArtifactFilter]],
+    Array<FileArtifact>
+  >,
+  'list_user_file_artifacts' : ActorMethod<
+    [[] | [FileArtifactFilter]],
+    Array<FileArtifact>
+  >,
   'login' : ActorMethod<[], string>,
   'logout' : ActorMethod<[], string>,
-  'start_summarization' : ActorMethod<[string], Result>,
-  'start_transcription' : ActorMethod<[string], Result>,
-  'start_upload' : ActorMethod<[StartUploadRequest], Result>,
+  'remove_bookmark' : ActorMethod<[string], Result>,
+  'start_summarization' : ActorMethod<[string], Result_1>,
+  'start_transcription' : ActorMethod<[string], Result_1>,
+  'start_upload' : ActorMethod<[StartUploadRequest], Result_1>,
   'toggle_file_artifact_visibility' : ActorMethod<[string], Result_2>,
-  'upload_chunk' : ActorMethod<[UploadChunkRequest], Result>,
+  'upload_chunk' : ActorMethod<[UploadChunkRequest], Result_1>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];
