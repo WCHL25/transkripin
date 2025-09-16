@@ -8,13 +8,23 @@ type FileArtifact = record {
   summary : opt Summary;
   transcription : opt Transcription;
   deleted_at : opt nat64;
+  visibility : FileArtifactVisibility;
   file_id : text;
 };
+type FileArtifactRequest = record {
+  title : opt text;
+  summary : opt Summary;
+  transcription : opt Transcription;
+  file_id : text;
+};
+type FileArtifactVisibility = variant { Private; Public };
 type JobStatus = variant { Failed : text; Completed : text; Pending };
 type Result = variant { Ok : text; Err : text };
-type Result_1 = variant { Ok : UploadedFile; Err : text };
-type Result_2 = variant { Ok : JobStatus; Err : text };
-type Result_3 = variant { Ok : record { nat64; nat64 }; Err : text };
+type Result_1 = variant { Ok; Err : text };
+type Result_2 = variant { Ok : FileArtifact; Err : text };
+type Result_3 = variant { Ok : UploadedFile; Err : text };
+type Result_4 = variant { Ok : JobStatus; Err : text };
+type Result_5 = variant { Ok : record { nat64; nat64 }; Err : text };
 type StartUploadRequest = record {
   total_chunks : nat64;
   content_type : text;
@@ -52,14 +62,17 @@ type UploadedFile = record {
 service : () -> {
   complete_upload : (text) -> (Result);
   delete_file : (text) -> (Result);
-  get_file : (text) -> (Result_1) query;
+  // Delete a file artifact
+  delete_file_artifact : (text) -> (Result_1);
+  edit_file_artifact : (FileArtifactRequest) -> (Result_2);
+  get_file : (text) -> (Result_3) query;
   // Query a file artifact
   get_file_artifact : (text) -> (opt FileArtifact) query;
   get_summary_result : (text) -> (Result) query;
   get_transcription : (text) -> (Result) query;
   get_transcription_result : (text) -> (Result);
-  get_transcription_status : (text) -> (Result_2);
-  get_upload_status : (text) -> (Result_3) query;
+  get_transcription_status : (text) -> (Result_4);
+  get_upload_status : (text) -> (Result_5) query;
   get_user_id : (principal) -> (text) query;
   list_files : () -> (vec record { text; text; text; nat64 }) query;
   // List all file artifact for the current caller
@@ -69,5 +82,6 @@ service : () -> {
   start_summarization : (text) -> (Result);
   start_transcription : (text) -> (Result);
   start_upload : (StartUploadRequest) -> (Result);
+  toggle_file_artifact_visibility : (text) -> (Result_2);
   upload_chunk : (UploadChunkRequest) -> (Result);
 }

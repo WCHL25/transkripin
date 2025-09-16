@@ -12,18 +12,31 @@ export interface FileArtifact {
   'summary' : [] | [Summary],
   'transcription' : [] | [Transcription],
   'deleted_at' : [] | [bigint],
+  'visibility' : FileArtifactVisibility,
   'file_id' : string,
 }
+export interface FileArtifactRequest {
+  'title' : [] | [string],
+  'summary' : [] | [Summary],
+  'transcription' : [] | [Transcription],
+  'file_id' : string,
+}
+export type FileArtifactVisibility = { 'Private' : null } |
+  { 'Public' : null };
 export type JobStatus = { 'Failed' : string } |
   { 'Completed' : string } |
   { 'Pending' : null };
 export type Result = { 'Ok' : string } |
   { 'Err' : string };
-export type Result_1 = { 'Ok' : UploadedFile } |
+export type Result_1 = { 'Ok' : null } |
   { 'Err' : string };
-export type Result_2 = { 'Ok' : JobStatus } |
+export type Result_2 = { 'Ok' : FileArtifact } |
   { 'Err' : string };
-export type Result_3 = { 'Ok' : [bigint, bigint] } |
+export type Result_3 = { 'Ok' : UploadedFile } |
+  { 'Err' : string };
+export type Result_4 = { 'Ok' : JobStatus } |
+  { 'Err' : string };
+export type Result_5 = { 'Ok' : [bigint, bigint] } |
   { 'Err' : string };
 export interface StartUploadRequest {
   'total_chunks' : bigint,
@@ -62,13 +75,15 @@ export interface UploadedFile {
 export interface _SERVICE {
   'complete_upload' : ActorMethod<[string], Result>,
   'delete_file' : ActorMethod<[string], Result>,
-  'get_file' : ActorMethod<[string], Result_1>,
+  'delete_file_artifact' : ActorMethod<[string], Result_1>,
+  'edit_file_artifact' : ActorMethod<[FileArtifactRequest], Result_2>,
+  'get_file' : ActorMethod<[string], Result_3>,
   'get_file_artifact' : ActorMethod<[string], [] | [FileArtifact]>,
   'get_summary_result' : ActorMethod<[string], Result>,
   'get_transcription' : ActorMethod<[string], Result>,
   'get_transcription_result' : ActorMethod<[string], Result>,
-  'get_transcription_status' : ActorMethod<[string], Result_2>,
-  'get_upload_status' : ActorMethod<[string], Result_3>,
+  'get_transcription_status' : ActorMethod<[string], Result_4>,
+  'get_upload_status' : ActorMethod<[string], Result_5>,
   'get_user_id' : ActorMethod<[Principal], string>,
   'list_files' : ActorMethod<[], Array<[string, string, string, bigint]>>,
   'list_user_file_artifacts' : ActorMethod<[], Array<FileArtifact>>,
@@ -77,6 +92,7 @@ export interface _SERVICE {
   'start_summarization' : ActorMethod<[string], Result>,
   'start_transcription' : ActorMethod<[string], Result>,
   'start_upload' : ActorMethod<[StartUploadRequest], Result>,
+  'toggle_file_artifact_visibility' : ActorMethod<[string], Result_2>,
   'upload_chunk' : ActorMethod<[UploadChunkRequest], Result>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
