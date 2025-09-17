@@ -36,9 +36,9 @@ export type JobStatus = { 'Failed' : string } |
   { 'Pending' : null };
 export type LanguageFilter = { 'English' : null } |
   { 'Indonesia' : null };
-export type Result = { 'Ok' : null } |
+export type Result = { 'Ok' : string } |
   { 'Err' : string };
-export type Result_1 = { 'Ok' : string } |
+export type Result_1 = { 'Ok' : null } |
   { 'Err' : string };
 export type Result_2 = { 'Ok' : FileArtifact } |
   { 'Err' : string };
@@ -88,16 +88,15 @@ export interface UploadedFile {
   'deleted_at' : [] | [bigint],
 }
 export interface _SERVICE {
-  'add_bookmark' : ActorMethod<[string], Result>,
-  'complete_upload' : ActorMethod<[string], Result_1>,
-  'delete_file' : ActorMethod<[string], Result_1>,
-  'delete_file_artifact' : ActorMethod<[string], Result>,
+  'complete_upload' : ActorMethod<[string], Result>,
+  'delete_file' : ActorMethod<[string], Result>,
+  'delete_file_artifact' : ActorMethod<[string], Result_1>,
   'edit_file_artifact' : ActorMethod<[FileArtifactRequest], Result_2>,
   'get_file' : ActorMethod<[string], Result_3>,
   'get_file_artifact' : ActorMethod<[string], [] | [FileArtifact]>,
-  'get_summary_result' : ActorMethod<[string], Result_1>,
-  'get_transcription' : ActorMethod<[string], Result_1>,
-  'get_transcription_result' : ActorMethod<[string], Result_1>,
+  'get_summary_result' : ActorMethod<[string], JobStatus>,
+  'get_transcription' : ActorMethod<[string], Result>,
+  'get_transcription_result' : ActorMethod<[string], Result>,
   'get_transcription_status' : ActorMethod<[string], Result_4>,
   'get_upload_status' : ActorMethod<[string], Result_5>,
   'get_user_id' : ActorMethod<[Principal], string>,
@@ -112,12 +111,16 @@ export interface _SERVICE {
   >,
   'login' : ActorMethod<[], string>,
   'logout' : ActorMethod<[], string>,
-  'remove_bookmark' : ActorMethod<[string], Result>,
-  'start_summarization' : ActorMethod<[string], Result_1>,
-  'start_transcription' : ActorMethod<[string], Result_1>,
-  'start_upload' : ActorMethod<[StartUploadRequest], Result_1>,
-  'toggle_file_artifact_visibility' : ActorMethod<[string], Result_2>,
-  'upload_chunk' : ActorMethod<[UploadChunkRequest], Result_1>,
+  'search_file_artifacts' : ActorMethod<
+    [[] | [FileArtifactFilter]],
+    Array<FileArtifact>
+  >,
+  'start_summarization' : ActorMethod<[string], Result>,
+  'start_transcription' : ActorMethod<[string], Result>,
+  'start_upload' : ActorMethod<[StartUploadRequest], Result>,
+  'toggle_file_artifact_bookmark' : ActorMethod<[string], Result>,
+  'toggle_file_artifact_visibility' : ActorMethod<[string], Result>,
+  'upload_chunk' : ActorMethod<[UploadChunkRequest], Result>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

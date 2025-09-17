@@ -1,6 +1,6 @@
 export const idlFactory = ({ IDL }) => {
-  const Result = IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text });
-  const Result_1 = IDL.Variant({ 'Ok' : IDL.Text, 'Err' : IDL.Text });
+  const Result = IDL.Variant({ 'Ok' : IDL.Text, 'Err' : IDL.Text });
+  const Result_1 = IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text });
   const Summary = IDL.Record({
     'text' : IDL.Text,
     'created_at' : IDL.Nat64,
@@ -92,10 +92,9 @@ export const idlFactory = ({ IDL }) => {
     'data' : IDL.Vec(IDL.Nat8),
   });
   return IDL.Service({
-    'add_bookmark' : IDL.Func([IDL.Text], [Result], []),
-    'complete_upload' : IDL.Func([IDL.Text], [Result_1], []),
-    'delete_file' : IDL.Func([IDL.Text], [Result_1], []),
-    'delete_file_artifact' : IDL.Func([IDL.Text], [Result], []),
+    'complete_upload' : IDL.Func([IDL.Text], [Result], []),
+    'delete_file' : IDL.Func([IDL.Text], [Result], []),
+    'delete_file_artifact' : IDL.Func([IDL.Text], [Result_1], []),
     'edit_file_artifact' : IDL.Func([FileArtifactRequest], [Result_2], []),
     'get_file' : IDL.Func([IDL.Text], [Result_3], ['query']),
     'get_file_artifact' : IDL.Func(
@@ -103,9 +102,9 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(FileArtifact)],
         ['query'],
       ),
-    'get_summary_result' : IDL.Func([IDL.Text], [Result_1], ['query']),
-    'get_transcription' : IDL.Func([IDL.Text], [Result_1], ['query']),
-    'get_transcription_result' : IDL.Func([IDL.Text], [Result_1], []),
+    'get_summary_result' : IDL.Func([IDL.Text], [JobStatus], ['query']),
+    'get_transcription' : IDL.Func([IDL.Text], [Result], ['query']),
+    'get_transcription_result' : IDL.Func([IDL.Text], [Result], []),
     'get_transcription_status' : IDL.Func([IDL.Text], [Result_4], []),
     'get_upload_status' : IDL.Func([IDL.Text], [Result_5], ['query']),
     'get_user_id' : IDL.Func([IDL.Principal], [IDL.Text], ['query']),
@@ -126,12 +125,17 @@ export const idlFactory = ({ IDL }) => {
       ),
     'login' : IDL.Func([], [IDL.Text], []),
     'logout' : IDL.Func([], [IDL.Text], []),
-    'remove_bookmark' : IDL.Func([IDL.Text], [Result], []),
-    'start_summarization' : IDL.Func([IDL.Text], [Result_1], []),
-    'start_transcription' : IDL.Func([IDL.Text], [Result_1], []),
-    'start_upload' : IDL.Func([StartUploadRequest], [Result_1], []),
-    'toggle_file_artifact_visibility' : IDL.Func([IDL.Text], [Result_2], []),
-    'upload_chunk' : IDL.Func([UploadChunkRequest], [Result_1], []),
+    'search_file_artifacts' : IDL.Func(
+        [IDL.Opt(FileArtifactFilter)],
+        [IDL.Vec(FileArtifact)],
+        ['query'],
+      ),
+    'start_summarization' : IDL.Func([IDL.Text], [Result], []),
+    'start_transcription' : IDL.Func([IDL.Text], [Result], []),
+    'start_upload' : IDL.Func([StartUploadRequest], [Result], []),
+    'toggle_file_artifact_bookmark' : IDL.Func([IDL.Text], [Result], []),
+    'toggle_file_artifact_visibility' : IDL.Func([IDL.Text], [Result], []),
+    'upload_chunk' : IDL.Func([UploadChunkRequest], [Result], []),
   });
 };
 export const init = ({ IDL }) => { return []; };

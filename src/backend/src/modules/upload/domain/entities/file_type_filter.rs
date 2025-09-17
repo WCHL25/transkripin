@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use crate::impl_storable;
 
-#[derive(CandidType, Deserialize)]
+#[derive(CandidType, Clone, Copy, Deserialize)]
 pub enum FileTypeFilter {
     Video,
     Audio,

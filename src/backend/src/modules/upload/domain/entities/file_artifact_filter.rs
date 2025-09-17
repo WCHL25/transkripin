@@ -5,7 +5,7 @@ use crate::impl_storable;
 
 use super::{ SortOrderFilter, FileTypeFilter, LanguageFilter };
 
-#[derive(CandidType, Deserialize)]
+#[derive(Clone, CandidType, Deserialize)]
 pub struct FileArtifactFilter {
     pub sort: Option<SortOrderFilter>,
     pub file_type: Option<FileTypeFilter>,

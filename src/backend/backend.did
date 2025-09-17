@@ -27,8 +27,8 @@ type FileArtifactVisibility = variant { Private; Public };
 type FileTypeFilter = variant { Audio; Video };
 type JobStatus = variant { Failed : text; Completed : text; Pending };
 type LanguageFilter = variant { English; Indonesia };
-type Result = variant { Ok; Err : text };
-type Result_1 = variant { Ok : text; Err : text };
+type Result = variant { Ok : text; Err : text };
+type Result_1 = variant { Ok; Err : text };
 type Result_2 = variant { Ok : FileArtifact; Err : text };
 type Result_3 = variant { Ok : UploadedFile; Err : text };
 type Result_4 = variant { Ok : JobStatus; Err : text };
@@ -75,19 +75,19 @@ type UploadedFile = record {
   deleted_at : opt nat64;
 };
 service : () -> {
-  // Bookmark a file artifact
-  add_bookmark : (text) -> (Result);
-  complete_upload : (text) -> (Result_1);
-  delete_file : (text) -> (Result_1);
+  complete_upload : (text) -> (Result);
+  delete_file : (text) -> (Result);
   // Delete a file artifact
-  delete_file_artifact : (text) -> (Result);
+  delete_file_artifact : (text) -> (Result_1);
+  // Update a file artifact
   edit_file_artifact : (FileArtifactRequest) -> (Result_2);
   get_file : (text) -> (Result_3) query;
   // Query a file artifact
   get_file_artifact : (text) -> (opt FileArtifact) query;
-  get_summary_result : (text) -> (Result_1) query;
-  get_transcription : (text) -> (Result_1) query;
-  get_transcription_result : (text) -> (Result_1);
+  // Query a summary result
+  get_summary_result : (text) -> (JobStatus) query;
+  get_transcription : (text) -> (Result) query;
+  get_transcription_result : (text) -> (Result);
   get_transcription_status : (text) -> (Result_4);
   get_upload_status : (text) -> (Result_5) query;
   get_user_id : (principal) -> (text) query;
@@ -102,11 +102,15 @@ service : () -> {
     ) query;
   login : () -> (text);
   logout : () -> (text);
-  // Remove a bookmark file artifact
-  remove_bookmark : (text) -> (Result);
-  start_summarization : (text) -> (Result_1);
-  start_transcription : (text) -> (Result_1);
-  start_upload : (StartUploadRequest) -> (Result_1);
-  toggle_file_artifact_visibility : (text) -> (Result_2);
-  upload_chunk : (UploadChunkRequest) -> (Result_1);
+  // Search all file artifacts
+  search_file_artifacts : (opt FileArtifactFilter) -> (vec FileArtifact) query;
+  // Start the summarization process
+  start_summarization : (text) -> (Result);
+  start_transcription : (text) -> (Result);
+  start_upload : (StartUploadRequest) -> (Result);
+  // Bookmark a file artifact
+  toggle_file_artifact_bookmark : (text) -> (Result);
+  // Toggle visibility of a file artifact
+  toggle_file_artifact_visibility : (text) -> (Result);
+  upload_chunk : (UploadChunkRequest) -> (Result);
 }

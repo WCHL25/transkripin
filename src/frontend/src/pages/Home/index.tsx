@@ -226,18 +226,27 @@ const Home = () => {
          while (true) {
             console.log("Trying to get summary...");
             const summaryResult = await backend.get_summary_result(fileId);
-            console.log("Summary result:", summaryResult);
-            if ("Ok" in summaryResult) {
-               fileArtifact = summaryResult.Ok;
-               if (fileArtifact.startsWith("Err")) {
-                  console.error(fileArtifact);
-                  break;
-               }
+
+            if ("Pending" in summaryResult) {
+               console.log("⏳ Summary still processing...");
+               await new Promise((resolve) =>
+                  setTimeout(resolve, pollInterval)
+               );
+               pollInterval = Math.min(pollInterval * 1.1, 5000);
+               continue;
+            }
+
+            if ("Completed" in summaryResult) {
+               fileArtifact = summaryResult.Completed;
+               console.log("✅ Summarization completed");
                break;
             }
 
-            await new Promise((resolve) => setTimeout(resolve, pollInterval));
-            pollInterval = Math.min(pollInterval * 1.1, 5000); // Max 5 seconds for summary
+            if ("Failed" in summaryResult) {
+               console.error("❌ Summarization failed:", summaryResult.Failed);
+               fileArtifact = summaryResult.Failed;
+               break;
+            }
          }
 
          console.log("Summary result", fileArtifact);

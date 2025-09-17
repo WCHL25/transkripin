@@ -6,6 +6,7 @@ use crate::modules::{
     SortOrderFilter,
 };
 
+/// Apply all filters and sorting to a list of file artifacts
 pub fn filter_file_artifacts(
     mut artifacts: Vec<FileArtifact>,
     filter: Option<FileArtifactFilter>
@@ -13,72 +14,76 @@ pub fn filter_file_artifacts(
     if let Some(filter) = filter {
         // File type filter
         if let Some(file_type) = filter.file_type {
-            match file_type {
-                FileTypeFilter::Video => {
-                    artifacts.retain(|a| a.content_type.starts_with("video/"));
-                }
-                FileTypeFilter::Audio => {
-                    artifacts.retain(|a| a.content_type.starts_with("audio/"));
-                }
-            }
+            artifacts.retain(|a| matches_file_type(a, file_type));
         }
 
         // Language filter
         if let Some(language) = filter.language {
-            match language {
-                LanguageFilter::English => {
-                    artifacts.retain(|a| {
-                        a.transcription
-                            .as_ref()
-                            .map(|t| t.language.eq_ignore_ascii_case("en"))
-                            .unwrap_or(false)
-                    });
-                }
-                LanguageFilter::Indonesia => {
-                    artifacts.retain(|a| {
-                        a.transcription
-                            .as_ref()
-                            .map(|t| t.language.eq_ignore_ascii_case("id"))
-                            .unwrap_or(false)
-                    });
-                }
-            }
+            artifacts.retain(|a| matches_language(a, language));
         }
 
         // Search filter
         if let Some(query) = filter.search {
-            artifacts.retain(|a| {
-                a.title.as_ref().map_or(false, |t| t.to_lowercase().contains(&query.to_lowercase()))
-            });
+            let q = query.to_lowercase();
+            artifacts.retain(|a| matches_search(a, &q));
         }
 
-        // Sorting
-        match filter.sort.unwrap_or(SortOrderFilter::Newest) {
-            SortOrderFilter::Newest => artifacts.sort_by(|a, b| b.created_at.cmp(&a.created_at)),
-            SortOrderFilter::Oldest => artifacts.sort_by(|a, b| a.created_at.cmp(&b.created_at)),
-            SortOrderFilter::AlphabeticalAsc => {
-                artifacts.sort_by(|a, b| {
-                    a.title
-                        .as_ref()
-                        .unwrap_or(&a.filename)
-                        .to_lowercase()
-                        .cmp(&b.title.as_ref().unwrap_or(&b.filename).to_lowercase())
-                });
-            }
-            SortOrderFilter::AlphabeticalDesc => {
-                artifacts.sort_by(|a, b| {
-                    b.title
-                        .as_ref()
-                        .unwrap_or(&b.filename)
-                        .to_lowercase()
-                        .cmp(&a.title.as_ref().unwrap_or(&a.filename).to_lowercase())
-                });
-            }
-        }
+        sort_artifacts(&mut artifacts, filter.sort.unwrap_or(SortOrderFilter::Newest));
     } else {
-        // Default sort
-        artifacts.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        // Default sort: newest
+        sort_artifacts(&mut artifacts, SortOrderFilter::Newest);
     }
 
     artifacts
+}
+
+/// Filter by file type (video/audio)
+fn matches_file_type(artifact: &FileArtifact, file_type: FileTypeFilter) -> bool {
+    match file_type {
+        FileTypeFilter::Video => artifact.content_type.starts_with("video/"),
+        FileTypeFilter::Audio => artifact.content_type.starts_with("audio/"),
+    }
+}
+
+/// Filter by transcription language
+fn matches_language(artifact: &FileArtifact, language: LanguageFilter) -> bool {
+    match artifact.transcription.as_ref().map(|t| t.language.as_str()) {
+        Some(lang) =>
+            match language {
+                LanguageFilter::English => lang.eq_ignore_ascii_case("en"),
+                LanguageFilter::Indonesia => lang.eq_ignore_ascii_case("id"),
+            }
+        None => false,
+    }
+}
+
+/// Filter by search query (title or filename)
+fn matches_search(artifact: &FileArtifact, query: &str) -> bool {
+    artifact.title
+        .as_ref()
+        .map(|t| t.to_lowercase().contains(query))
+        .unwrap_or(false) || artifact.filename.to_lowercase().contains(query)
+}
+
+/// Apply sorting order
+fn sort_artifacts(artifacts: &mut Vec<FileArtifact>, sort: SortOrderFilter) {
+    match sort {
+        SortOrderFilter::Newest => {
+            artifacts.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        }
+        SortOrderFilter::Oldest => {
+            artifacts.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        }
+        SortOrderFilter::AlphabeticalAsc => {
+            artifacts.sort_by(|a, b| { title_or_filename(a).cmp(&title_or_filename(b)) });
+        }
+        SortOrderFilter::AlphabeticalDesc => {
+            artifacts.sort_by(|a, b| { title_or_filename(b).cmp(&title_or_filename(a)) });
+        }
+    }
+}
+
+/// Helper to pick a display string for sorting (title ?? filename)
+fn title_or_filename(artifact: &FileArtifact) -> String {
+    artifact.title.as_ref().unwrap_or(&artifact.filename).to_lowercase()
 }

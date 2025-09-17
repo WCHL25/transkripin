@@ -9,4 +9,10 @@ pub enum FileArtifactVisibility {
     Private,
 }
 
+impl FileArtifactVisibility {
+    pub fn is_public(&self) -> bool {
+        matches!(self, FileArtifactVisibility::Public)
+    }
+}
+
 impl_storable!(FileArtifactVisibility);

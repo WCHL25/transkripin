@@ -1,8 +1,12 @@
+use std::panic::AssertUnwindSafe;
+
+use futures::FutureExt;
 use ic_llm::{ ChatMessage, Model };
 
 pub async fn call_ollama(prompt_text: String) -> Result<String, String> {
     let truncated_text = &prompt_text[..std::cmp::min(prompt_text.len(), 5000)];
-    let response = ic_llm
+
+    let call = ic_llm
         ::chat(Model::Llama3_1_8B)
         .with_messages(
             vec![
@@ -14,10 +18,16 @@ pub async fn call_ollama(prompt_text: String) -> Result<String, String> {
                 }
             ]
         )
-        .send().await;
+        .send();
 
-    match response.message.content {
-        Some(text) if !text.is_empty() => Ok(text),
-        _ => Err("No content returned from ic-llm".to_string()),
+    // Catch panics instead of crashing the whole canister
+    match AssertUnwindSafe(call).catch_unwind().await {
+        Ok(response) => {
+            match response.message.content {
+                Some(text) if !text.is_empty() => Ok(text),
+                _ => Err("No content returned from ic-llm".to_string()),
+            }
+        }
+        Err(_) => Err("ic-llm panicked (timeout or fatal error)".to_string()),
     }
 }
