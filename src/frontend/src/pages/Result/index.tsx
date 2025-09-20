@@ -1,6 +1,14 @@
-import { Box, IconButton, Tab, Tabs, Tooltip } from "@mui/material";
+import {
+   Box,
+   debounce,
+   IconButton,
+   Skeleton,
+   Tab,
+   Tabs,
+   Tooltip,
+} from "@mui/material";
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import exampleVideo from "@/assets/video/example.mp4";
 import {
    MdChevronLeft,
@@ -9,63 +17,68 @@ import {
    MdSearch,
    MdShare,
 } from "react-icons/md";
-import { useDebouncedCallback } from "use-debounce";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import ModalDelete from "./components/ModalDelete";
-import { Work } from "@/data/work";
 import ModalShare from "./components/ModalShare";
+import { useBackend } from "@/hooks/useBackend";
+import { FileArtifact } from "declarations/backend/backend.did";
+import { formatRelativeTime } from "@/utils/dateUtils";
 
-interface Transcript {
-   second: string;
-   text: string;
-}
+// interface Transcript {
+//    second: string;
+//    text: string;
+// }
 
-const dummyTranscript: Transcript[] = [
-   {
-      second: "00:07",
-      text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
-   },
-   {
-      second: "00:25",
-      text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
-   },
-];
-
-const dummySummary =
-   "Lorem ipsum dolor sit amet consectetur adipisicing elit. Asperiores reprehenderit deserunt vel dolore laudantium incidunt, odit quia in eveniet ratione ipsum iste molestias culpa odio a aut! Praesentium, voluptate reprehenderit.";
+// const dummyTranscript: Transcript[] = [
+//    {
+//       second: "00:07",
+//       text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+//    },
+//    {
+//       second: "00:25",
+//       text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+//    },
+// ];
 
 const Result = () => {
    const [selectedTab, setSelectedTab] = useState<"transcript" | "summary">(
       "transcript"
    );
-   const [openShare, setOpenShare] = useState<Work | null>(null);
-   const [openDelete, setOpenDelete] = useState<Work | null>(null);
+   const [work, setWork] = useState<FileArtifact | null>(null);
+   const [openShare, setOpenShare] = useState<boolean>(false);
+   const [openDelete, setOpenDelete] = useState<boolean>(false);
    const [isCopied, setIsCopied] = useState(false);
+   const [loading, setLoading] = useState(true);
 
    const location = useLocation();
+   const { id } = useParams();
    const setSnackbar = useSnackbarStore((s) => s.setSnackbar);
 
-   const { videoUrl, fileType, summary, transcript, title } =
-      location.state || {};
+   const { videoUrl } = location.state || {};
 
    const _videoUrl = videoUrl || exampleVideo;
-   const _title = title || "Pembahasan AI";
-   const _summary = summary || dummySummary;
-   const _transcript = transcript || dummyTranscript;
-   const _fileType = fileType || "video";
 
-   const handleChangeTab = (_: React.SyntheticEvent, value: any) => {
+   const handleChangeTab = (
+      _: React.SyntheticEvent,
+      value: "transcript" | "summary"
+   ) => {
       setSelectedTab(value);
    };
 
-   const debounced = useDebouncedCallback(() => {
+   const backend = useBackend();
+
+   const debounced = debounce(() => {
       setIsCopied(false);
    }, 2000);
 
    const handleCopy = async () => {
+      if (!work) return;
+
       try {
          await navigator.clipboard.writeText(
-            selectedTab == "summary" ? _summary : JSON.stringify(_transcript)
+            selectedTab == "summary"
+               ? work.summary[0]!.text
+               : JSON.stringify(work.transcription[0]!.text)
          );
 
          setIsCopied(true);
@@ -79,19 +92,47 @@ const Result = () => {
       }
    };
 
+   const handleGetDetail = async () => {
+      setLoading(true);
+      const fileArtifact = await backend.get_file_artifact(id!);
+      setWork(fileArtifact[0] || null);
+      setLoading(false);
+      console.log(fileArtifact);
+   };
+
+   const toggleVisibility = () => {
+      if (!work) return;
+
+      if ("Public" in work.visibility) {
+         work.visibility = { Private: null };
+      } else {
+         work.visibility = { Public: null };
+      }
+
+      setWork({...work});
+   };
+
    useEffect(() => {
       console.log(videoUrl);
-      console.log(summary);
-      console.log(fileType);
-      if (!videoUrl || !summary || !fileType) {
-         //   navigate('/saved');
-      }
-   }, [videoUrl, summary, fileType]);
+   }, [videoUrl]);
+
+   useEffect(() => {
+      handleGetDetail();
+   }, []);
 
    return (
       <Box className="px-5 pt-28 pb-20 container mx-auto">
-         <ModalDelete open={openDelete} setOpen={setOpenDelete} />
-         <ModalShare open={openShare} setOpen={setOpenShare} />
+         <ModalDelete
+            open={openDelete}
+            onClose={() => setOpenDelete(false)}
+            data={work}
+         />
+         <ModalShare
+            open={openShare}
+            onClose={() => setOpenShare(false)}
+            data={work}
+            toggleVisibility={toggleVisibility}
+         />
          <Link
             to={"/saved"}
             className="flex gap-[2px] items-center text-primary font-bold mb-5 hover:underline"
@@ -102,37 +143,34 @@ const Result = () => {
 
          <Box className="mb-8 flex items-center justify-between gap-3">
             <Box>
-               <h1 className="font-bold text-[22px] mb-[2px]">{_title}</h1>
-               <p className=" font-bold text-foreground2 ">Just now - Today</p>
+               {loading ? (
+                  <>
+                     <Skeleton
+                        variant="text"
+                        className="text-[22px]/normal mb-0.5 w-140"
+                     />
+                     <Skeleton
+                        variant="text"
+                        className="text-sm/normal mb-0.5 w-40"
+                     />
+                  </>
+               ) : (
+                  <>
+                     <h1 className="font-bold text-[22px] mb-0.5">
+                        {work?.title}
+                     </h1>
+                     <p className=" font-bold text-foreground2 ">
+                        {formatRelativeTime(work!.created_at)}
+                     </p>
+                  </>
+               )}
             </Box>
 
             <Box className="flex gap-5 items-center">
-               <IconButton
-                  onClick={() =>
-                     setOpenShare({
-                        id: 1,
-                        title: _title,
-                        date: "",
-                        description: "",
-                        type: "video",
-                        visibility: "public",
-                     })
-                  }
-               >
+               <IconButton onClick={() => setOpenShare(true)}>
                   <MdShare className="text-2xl text-foreground" />
                </IconButton>
-               <IconButton
-                  onClick={() =>
-                     setOpenDelete({
-                        id: 1,
-                        title: _title,
-                        date: "",
-                        description: "",
-                        type: "video",
-                        visibility: "public",
-                     })
-                  }
-               >
+               <IconButton onClick={() => setOpenDelete(true)}>
                   <MdDelete className="text-2xl text-foreground" />
                </IconButton>
             </Box>
@@ -140,13 +178,13 @@ const Result = () => {
 
          <Box className="relative flex gap-5 items-stretch">
             <Box className="grow basis-0 rounded-lg overflow-hidden">
-               {_fileType?.startsWith("video") ? (
+               {work?.content_type.startsWith("video") ? (
                   <video
                      src={_videoUrl}
                      controls
                      className="w-full rounded-xl"
                   ></video>
-               ) : _fileType?.startsWith("audio") ? (
+               ) : work?.content_type.startsWith("audio") ? (
                   <audio controls>
                      <source src={_videoUrl} type="audio/mp3" />
                      Your browser does not support the audio element.
@@ -192,10 +230,10 @@ const Result = () => {
                      </Tooltip>
                   </Box>
                   {selectedTab == "summary" ? (
-                     <Box className="p-5">{_summary}</Box>
+                     <Box className="p-5">{work?.summary[0]?.text}</Box>
                   ) : (
                      <Box className="p-5 flex flex-col gap-6">
-                        {_transcript.map((t: Transcript) => (
+                        {/* {work?.transcription[0]?.text.map((t: Transcript) => (
                            <Box
                               key={t.second}
                               className="flex gap-4 items-start"
@@ -205,7 +243,7 @@ const Result = () => {
                               </p>
                               <p>{t.text}</p>
                            </Box>
-                        ))}
+                        ))} */}
                      </Box>
                   )}
                </Box>

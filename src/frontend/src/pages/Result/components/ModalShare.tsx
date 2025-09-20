@@ -1,42 +1,56 @@
 import { useState } from "react";
-import { MdLink, MdOutlineContentCopy, MdPublic } from "react-icons/md";
-import { RiGitRepositoryPrivateFill } from "react-icons/ri";
+import { MdLink, MdLock, MdOutlineContentCopy, MdPublic } from "react-icons/md";
 import {
    Box,
    Button,
+   debounce,
    Dialog,
    DialogActions,
    DialogContent,
    Switch,
    Tooltip,
 } from "@mui/material";
-import { Work } from "@/data/work";
-import { useDebouncedCallback } from "use-debounce";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
+import { FileArtifact } from "declarations/backend/backend.did";
+import { useBackend } from "@/hooks/useBackend";
 
-const ModalShare = ({
-   open,
-   setOpen,
-}: {
-   open: Work | null;
-   setOpen: React.Dispatch<React.SetStateAction<Work | null>>;
-}) => {
+interface Props {
+   open: boolean;
+   onClose: () => void;
+   data: FileArtifact | null;
+   toggleVisibility: () => void;
+}
+
+const ModalShare = ({ open, onClose, data, toggleVisibility }: Props) => {
    const [isCopied, setIsCopied] = useState(false);
+   const [loading, setLoading] = useState(false);
 
    const setSnackbar = useSnackbarStore((s) => s.setSnackbar);
 
-   const onClose = async () => {
-      setOpen(null);
-   };
-
-   const debounced = useDebouncedCallback(() => {
+   const debounced = debounce(() => {
       setIsCopied(false);
    }, 2000);
 
-   const handleClick = async () => {
+   const backend = useBackend();
+
+   const handleChangeVisibility = async () => {
+      toggleVisibility();
+      setLoading(true);
+      const result = await backend.toggle_file_artifact_visibility(
+         data!.file_id
+      );
+      setLoading(false);
+      if ("Err" in result) {
+         toggleVisibility();
+      }
+
+      setLoading(false);
+   };
+
+   const handleCopy = async () => {
       try {
          await navigator.clipboard.writeText(
-            `${location.origin}/works/${open?.id}`
+            `${location.origin}/works/${data?.file_id}`
          );
 
          setIsCopied(true);
@@ -51,29 +65,41 @@ const ModalShare = ({
    };
 
    return (
-      <Dialog open={Boolean(open)} onClose={onClose} fullWidth maxWidth={"sm"}>
+      <Dialog
+         open={open}
+         onClose={onClose}
+         fullWidth
+         maxWidth={"sm"}
+         sx={{ "& .MuiPaper-root": { maxWidth: "520px" } }}
+      >
          <DialogContent className="bg-background2">
             <Box className="pb-4 border-b border-background3 mb-5">
-               <h1 className=" font-bold text-xl mb-1">Share Work</h1>
-               <p className="text-foreground2">Allow anyone to view this work</p>
+               <h1 className=" font-bold text-xl mb-1">
+                  Share "{data?.title}"
+               </h1>
+               <p className="text-foreground2">
+                  Allow anyone to view this work
+               </p>
             </Box>
 
             <Box className="flex justify-between gap-2 items-center mb-5">
                <Box className="flex gap-2 items-center">
                   <Box className="w-8 h-8 grid place-items-center text-xl text-foreground bg-background3 rounded-lg">
-                     {open?.visibility == "public" ? (
+                     {data && "Public" in data.visibility ? (
                         <MdPublic />
                      ) : (
-                        <RiGitRepositoryPrivateFill />
+                        <MdLock />
                      )}
                   </Box>
 
                   <Box>
                      <p className="font-semibold">
-                        {open?.visibility == "public" ? "Public" : "Private"}
+                        {data && "Public" in data.visibility
+                           ? "Public"
+                           : "Private"}
                      </p>
                      <p className="text-foreground2 text-xs">
-                        {open?.visibility == "public"
+                        {data && "Public" in data.visibility
                            ? "Anyone can view"
                            : "Only you can view"}
                      </p>
@@ -81,14 +107,9 @@ const ModalShare = ({
                </Box>
 
                <Switch
-                  checked={open?.visibility == "public"}
-                  onChange={(e) =>
-                     open &&
-                     setOpen({
-                        ...open,
-                        visibility: e.target.checked ? "public" : "private",
-                     })
-                  }
+                  checked={Boolean(data && "Public" in data.visibility)}
+                  onChange={handleChangeVisibility}
+                  disabled={loading}
                />
             </Box>
 
@@ -98,7 +119,7 @@ const ModalShare = ({
                   <input
                      type="text"
                      className="w-full pl-9 bg-white py-2 px-3 rounded-md text-background"
-                     value={`${location.origin}/works/${open?.id}`}
+                     value={`${location.origin}/works/${data?.file_id}`}
                      disabled
                   />
                </Box>
@@ -108,13 +129,18 @@ const ModalShare = ({
                      "Link" +
                      (isCopied ? " copied" : "")
                   }
-                  open={isCopied === true ? true : undefined}
+                  open={
+                     isCopied === true &&
+                     Boolean(data && "Private" in data.visibility)
+                        ? true
+                        : undefined
+                  }
                >
                   <Button
                      variant="outlined"
                      className="flex items-center gap-2 !px-3"
-                     onClick={handleClick}
-                     disabled={open?.visibility != "public"}
+                     onClick={handleCopy}
+                     disabled={Boolean(data && "Private" in data.visibility)}
                   >
                      <MdOutlineContentCopy />
                      Copy
