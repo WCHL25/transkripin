@@ -1,9 +1,11 @@
+import useProgressBarHandler from "@/hooks/useProgressHandler";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { Snackbar } from "@mui/material";
 import { Outlet, ScrollRestoration } from "react-router-dom";
 
 const Root = () => {
   const { snackbar, setSnackbar } = useSnackbarStore();
+  useProgressBarHandler();
 
   return (
     <>

@@ -1,6 +1,14 @@
-import { Box, IconButton, Tab, Tabs, Tooltip } from "@mui/material";
-import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import {
+   Box,
+   debounce,
+   IconButton,
+   Skeleton,
+   Tab,
+   Tabs,
+   Tooltip,
+} from "@mui/material";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { Link, useLocation, useParams } from "react-router-dom";
 import exampleVideo from "@/assets/video/example.mp4";
 import {
    MdChevronLeft,
@@ -8,90 +16,218 @@ import {
    MdDelete,
    MdSearch,
    MdShare,
+   MdClose,
 } from "react-icons/md";
-import { useDebouncedCallback } from "use-debounce";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import ModalDelete from "./components/ModalDelete";
-import { Work } from "@/data/work";
 import ModalShare from "./components/ModalShare";
+import { useBackend } from "@/hooks/useBackend";
+import { FileArtifact } from "declarations/backend/backend.did";
+import { formatRelativeTime, formatTime } from "@/utils/dateUtils";
 
-interface Transcript {
-   second: string;
+// Component untuk highlight text
+const HighlightText = ({
+   text,
+   searchTerm,
+}: {
    text: string;
-}
+   searchTerm: string;
+}) => {
+   if (!searchTerm.trim()) {
+      return <span>{text}</span>;
+   }
 
-const dummyTranscript: Transcript[] = [
-   {
-      second: "00:07",
-      text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
-   },
-   {
-      second: "00:25",
-      text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
-   },
-];
+   const regex = new RegExp(
+      `(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+      "gi"
+   );
+   const parts = text.split(regex);
 
-const dummySummary =
-   "Lorem ipsum dolor sit amet consectetur adipisicing elit. Asperiores reprehenderit deserunt vel dolore laudantium incidunt, odit quia in eveniet ratione ipsum iste molestias culpa odio a aut! Praesentium, voluptate reprehenderit.";
+   return (
+      <span>
+         {parts.map((part, index) =>
+            regex.test(part) ? (
+               <mark
+                  key={index}
+                  className="bg-yellow-200 text-yellow-900 px-1 rounded"
+               >
+                  {part}
+               </mark>
+            ) : (
+               <span key={index}>{part}</span>
+            )
+         )}
+      </span>
+   );
+};
 
 const Result = () => {
    const [selectedTab, setSelectedTab] = useState<"transcript" | "summary">(
       "transcript"
    );
-   const [openShare, setOpenShare] = useState<Work | null>(null);
-   const [openDelete, setOpenDelete] = useState<Work | null>(null);
+   const [work, setWork] = useState<FileArtifact | null>(null);
+   const [openShare, setOpenShare] = useState<boolean>(false);
+   const [openDelete, setOpenDelete] = useState<boolean>(false);
    const [isCopied, setIsCopied] = useState(false);
+   const [loading, setLoading] = useState(true);
+   const [showSearch, setShowSearch] = useState(false);
+   const [searchTerm, setSearchTerm] = useState("");
 
    const location = useLocation();
+   const { id } = useParams();
    const setSnackbar = useSnackbarStore((s) => s.setSnackbar);
+   const searchInputRef = useRef<HTMLInputElement>(null);
 
-   const { videoUrl, fileType, summary, transcript, title } =
-      location.state || {};
-
+   const { videoUrl } = location.state || {};
    const _videoUrl = videoUrl || exampleVideo;
-   const _title = title || "Pembahasan AI";
-   const _summary = summary || dummySummary;
-   const _transcript = transcript || dummyTranscript;
-   const _fileType = fileType || "video";
 
-   const handleChangeTab = (_: React.SyntheticEvent, value: any) => {
+   // Debounced search function
+   const debouncedSetSearch = useMemo(
+      () =>
+         debounce((value: string) => {
+            setSearchTerm(value);
+         }, 300),
+      []
+   );
+
+   // Filter transcript segments berdasarkan search
+   const filteredSegments = useMemo(() => {
+      if (!work?.transcription[0]?.segments || !searchTerm.trim()) {
+         return work?.transcription[0]?.segments || [];
+      }
+
+      return work.transcription[0].segments.filter((segment) =>
+         segment.text.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+   }, [work?.transcription, searchTerm]);
+
+   // Handle search input change
+   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      debouncedSetSearch(value);
+   };
+
+   // Clear search
+   const clearSearch = () => {
+      setSearchTerm("");
+      if (searchInputRef.current) {
+         searchInputRef.current.value = "";
+      }
+   };
+
+   // Toggle search visibility
+   const toggleSearch = () => {
+      setShowSearch(!showSearch);
+      if (!showSearch) {
+         // Focus input ketika search dibuka
+         setTimeout(() => {
+            searchInputRef.current?.focus();
+         }, 100);
+      } else {
+         // Clear search ketika ditutup
+         clearSearch();
+      }
+   };
+
+   const handleChangeTab = (
+      _: React.SyntheticEvent,
+      value: "transcript" | "summary"
+   ) => {
       setSelectedTab(value);
    };
 
-   const debounced = useDebouncedCallback(() => {
+   const backend = useBackend();
+
+   const debounced = debounce(() => {
       setIsCopied(false);
    }, 2000);
 
    const handleCopy = async () => {
+      if (!work) return;
+
       try {
          await navigator.clipboard.writeText(
-            selectedTab == "summary" ? _summary : JSON.stringify(_transcript)
+            selectedTab == "summary"
+               ? work.summary[0]!.text
+               : JSON.stringify(work.transcription[0]!.text)
          );
 
          setIsCopied(true);
-
          debounced();
       } catch (error: any) {
          console.error(error.message);
          setSnackbar({
-            message: "Tautan gagal disalin. Silahkan salin manual",
+            message: "Link failed to copy. Please copy manually.",
          });
       }
    };
 
-   useEffect(() => {
-      console.log(videoUrl);
-      console.log(summary);
-      console.log(fileType);
-      if (!videoUrl || !summary || !fileType) {
-         //   navigate('/saved');
+   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
+
+   const handleSeekTo = (timeInSeconds: number) => {
+      if (mediaRef.current) {
+         mediaRef.current.currentTime = timeInSeconds;
+         mediaRef.current.play().catch(console.error);
       }
-   }, [videoUrl, summary, fileType]);
+   };
+
+   const handleGetDetail = async () => {
+      setLoading(true);
+
+      try {
+         const fileArtifact = await backend.get_file_artifact(id!);
+         setWork(fileArtifact[0] || null);
+         console.log(fileArtifact);
+      } catch (error: any) {
+         setSnackbar({ message: error.message });
+      }
+
+      setLoading(false);
+   };
+
+   const toggleVisibility = () => {
+      if (!work) return;
+
+      if ("Public" in work.visibility) {
+         work.visibility = { Private: null };
+      } else {
+         work.visibility = { Public: null };
+      }
+
+      setWork({ ...work });
+   };
+
+   // const handleGetFile = async () => {
+   //    const file = await backend.get_file(id!);
+   //    if ("Ok" in file) {
+   //       console.log(file.Ok);
+   //    }
+   // };
+
+   useEffect(() => {
+      if (!videoUrl) {
+         // handleGetFile()
+      }
+   }, [videoUrl]);
+
+   useEffect(() => {
+      handleGetDetail();
+   }, []);
 
    return (
       <Box className="px-5 pt-28 pb-20 container mx-auto">
-         <ModalDelete open={openDelete} setOpen={setOpenDelete} />
-         <ModalShare open={openShare} setOpen={setOpenShare} />
+         <ModalDelete
+            open={openDelete}
+            onClose={() => setOpenDelete(false)}
+            data={work}
+         />
+         <ModalShare
+            open={openShare}
+            onClose={() => setOpenShare(false)}
+            data={work}
+            toggleVisibility={toggleVisibility}
+         />
+
          <Link
             to={"/saved"}
             className="flex gap-[2px] items-center text-primary font-bold mb-5 hover:underline"
@@ -102,52 +238,54 @@ const Result = () => {
 
          <Box className="mb-8 flex items-center justify-between gap-3">
             <Box>
-               <h1 className="font-bold text-[22px] mb-[2px]">{_title}</h1>
-               <p className=" font-bold text-foreground2 ">Just now - Today</p>
+               {loading ? (
+                  <>
+                     <Skeleton
+                        variant="text"
+                        className="text-[22px]/normal mb-0.5 w-140"
+                     />
+                     <Skeleton
+                        variant="text"
+                        className="text-sm/normal mb-0.5 w-40"
+                     />
+                  </>
+               ) : (
+                  <>
+                     <h1 className="font-bold text-[22px] mb-0.5">
+                        {work?.title}
+                     </h1>
+                     <p className="font-bold text-foreground2">
+                        {formatRelativeTime(work!.created_at)}
+                     </p>
+                  </>
+               )}
             </Box>
 
             <Box className="flex gap-5 items-center">
-               <IconButton
-                  onClick={() =>
-                     setOpenShare({
-                        id: 1,
-                        title: _title,
-                        date: "",
-                        description: "",
-                        type: "video",
-                        visibility: "public",
-                     })
-                  }
-               >
+               <IconButton onClick={() => setOpenShare(true)}>
                   <MdShare className="text-2xl text-foreground" />
                </IconButton>
-               <IconButton
-                  onClick={() =>
-                     setOpenDelete({
-                        id: 1,
-                        title: _title,
-                        date: "",
-                        description: "",
-                        type: "video",
-                        visibility: "public",
-                     })
-                  }
-               >
+               <IconButton onClick={() => setOpenDelete(true)}>
                   <MdDelete className="text-2xl text-foreground" />
                </IconButton>
             </Box>
          </Box>
 
-         <Box className="relative flex gap-5 items-stretch">
-            <Box className="grow basis-0 rounded-lg overflow-hidden">
-               {_fileType?.startsWith("video") ? (
+         <Box className="flex gap-5 items-start">
+            <Box className="grow basis-0 rounded-lg overflow-hidden sticky top-20 self-start">
+               {work?.content_type.startsWith("video") ? (
                   <video
-                     src={_videoUrl}
+                     ref={mediaRef as React.RefObject<HTMLVideoElement>}
+                     src={exampleVideo}
                      controls
                      className="w-full rounded-xl"
-                  ></video>
-               ) : _fileType?.startsWith("audio") ? (
-                  <audio controls>
+                  />
+               ) : work?.content_type.startsWith("audio") ? (
+                  <audio
+                     controls
+                     ref={mediaRef as React.RefObject<HTMLAudioElement>}
+                     className="w-full"
+                  >
                      <source src={_videoUrl} type="audio/mp3" />
                      Your browser does not support the audio element.
                   </audio>
@@ -155,7 +293,8 @@ const Result = () => {
                   "This type of file is not supported"
                )}
             </Box>
-            <Box className="md:max-w-[500px] grow basis-0 rounded-lg bg-background">
+
+            <Box className="md:max-w-[500px] grow basis-0 rounded-lg bg-background min-h-[600px]">
                <Box className="border-b border-background3">
                   <Tabs
                      value={selectedTab}
@@ -172,10 +311,32 @@ const Result = () => {
                </Box>
 
                <Box>
+                  {/* Search Bar */}
                   <Box className="flex justify-end gap-1 items-center py-2 px-5">
-                     <IconButton>
+                     <Box className="relative flex items-center">
+                        <input
+                           ref={searchInputRef}
+                           type="text"
+                           placeholder={`Search ${selectedTab}...`}
+                           onChange={handleSearchChange}
+                           className={`${
+                              showSearch ? "w-48 px-3 pr-8" : "w-0 px-0"
+                           } transition-all duration-300 bg-foreground text-background py-1 rounded-md focus:outline-2 outline-primary`}
+                        />
+                        {showSearch && searchTerm && (
+                           <button
+                              onClick={clearSearch}
+                              className="absolute right-2 text-background hover:text-gray-300 transition-colors"
+                           >
+                              <MdClose className="text-sm" />
+                           </button>
+                        )}
+                     </Box>
+
+                     <IconButton onClick={toggleSearch}>
                         <MdSearch className="text-xl text-foreground2" />
                      </IconButton>
+
                      <Tooltip
                         title={
                            (!isCopied ? "Copy " : "") +
@@ -191,21 +352,124 @@ const Result = () => {
                         </IconButton>
                      </Tooltip>
                   </Box>
+
+                  {/* Search Results Info */}
+                  {searchTerm && (
+                     <Box className="px-5 py-2 text-sm text-foreground2">
+                        {selectedTab === "transcript" ? (
+                           <span>
+                              {filteredSegments.length} of{" "}
+                              {work?.transcription[0]?.segments.length || 0}{" "}
+                              segments match "{searchTerm}"
+                           </span>
+                        ) : (
+                           <span>Searching in summary for "{searchTerm}"</span>
+                        )}
+                     </Box>
+                  )}
+
+                  {/* Content */}
                   {selectedTab == "summary" ? (
-                     <Box className="p-5">{_summary}</Box>
+                     <Box className="p-5">
+                        {loading ? (
+                           <>
+                              <Skeleton
+                                 variant="text"
+                                 className="text-sm/normal w-full"
+                              />
+                              <Skeleton
+                                 variant="text"
+                                 className="text-sm/normal w-full"
+                              />
+                              <Skeleton
+                                 variant="text"
+                                 className="text-sm/normal w-full"
+                              />
+                              <Skeleton
+                                 variant="text"
+                                 className="text-sm/normal w-full"
+                              />
+                              <Skeleton
+                                 variant="text"
+                                 className="text-sm/normal w-4/5"
+                              />
+                           </>
+                        ) : (
+                           <div className="text-sm leading-relaxed">
+                              <HighlightText
+                                 text={work?.summary[0]?.text || ""}
+                                 searchTerm={searchTerm}
+                              />
+                           </div>
+                        )}
+                     </Box>
                   ) : (
                      <Box className="p-5 flex flex-col gap-6">
-                        {_transcript.map((t: Transcript) => (
-                           <Box
-                              key={t.second}
-                              className="flex gap-4 items-start"
-                           >
-                              <p className="text-primary hover:underline cursor-pointer">
-                                 {t.second}
-                              </p>
-                              <p>{t.text}</p>
-                           </Box>
-                        ))}
+                        {loading
+                           ? Array.from({ length: 6 }).map((_, idx) => (
+                                <Box
+                                   key={idx}
+                                   className="flex gap-4 items-start"
+                                >
+                                   <Skeleton
+                                      variant="text"
+                                      className="text-sm/normal w-12.5"
+                                   />
+                                   <Box className="grow basis-0">
+                                      <Skeleton
+                                         variant="text"
+                                         className="text-sm/normal w-full"
+                                      />
+                                      <Skeleton
+                                         variant="text"
+                                         className="text-sm/normal w-4/5"
+                                      />
+                                   </Box>
+                                </Box>
+                             ))
+                           : // Show filtered segments if searching, otherwise show all
+                             (searchTerm
+                                ? filteredSegments
+                                : work?.transcription[0]?.segments || []
+                             ).map((s) => {
+                                const startTime = formatTime(s.start);
+
+                                return (
+                                   <Box
+                                      key={s.id}
+                                      className="flex gap-4 items-start"
+                                   >
+                                      <Tooltip title={`Jump to ${startTime}`}>
+                                         <button
+                                            className="text-primary hover:underline cursor-pointer p-0 min-w-[50px] text-left"
+                                            onClick={() =>
+                                               handleSeekTo(s.start)
+                                            }
+                                         >
+                                            {startTime}
+                                         </button>
+                                      </Tooltip>
+                                      <p className="flex-1 text-sm leading-relaxed">
+                                         <HighlightText
+                                            text={s.text}
+                                            searchTerm={searchTerm}
+                                         />
+                                      </p>
+                                   </Box>
+                                );
+                             })}
+
+                        {/* No results message */}
+                        {searchTerm &&
+                           filteredSegments.length === 0 &&
+                           !loading && (
+                              <Box className="text-center py-8 text-foreground2">
+                                 <p>
+                                    No transcript segments found for "
+                                    {searchTerm}"
+                                 </p>
+                              </Box>
+                           )}
                      </Box>
                   )}
                </Box>

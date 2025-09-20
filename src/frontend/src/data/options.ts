@@ -1,46 +1,34 @@
 export const sortOptions = [
    {
       label: "Newest",
-      value: {
-         sortBy: "updated_at",
-         sort: "desc",
-      },
+      value: "Newest",
    },
    {
       label: "Oldest",
-      value: {
-         sortBy: "updated_at",
-         sort: "asc",
-      },
+      value: "Oldest",
    },
    {
       label: "Alphabetical (A-Z)",
-      value: {
-         sortBy: "title",
-         sort: "asc",
-      },
+      value: "AlphabeticalAsc",
    },
    {
       label: "Alphabetical (Z-A)",
-      value: {
-         sortBy: "title",
-         sort: "desc",
-      },
+      value: "AlphabeticalDesc",
    },
 ];
 
-export const typeOptions = [
+export const fileTypeOptions = [
    {
       label: "All",
       value: "",
    },
    {
       label: "Video",
-      value: "video",
+      value: "Video",
    },
    {
       label: "Audio",
-      value: "audio",
+      value: "Audio",
    },
 ];
 
@@ -51,10 +39,10 @@ export const languageOptions = [
    },
    {
       label: "English",
-      value: "english",
+      value: "English",
    },
    {
       label: "Indonesia",
-      value: "indonesia",
+      value: "Indonesia",
    },
 ];

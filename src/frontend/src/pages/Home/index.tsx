@@ -9,18 +9,17 @@ import { FaPlus } from "react-icons/fa6";
 import { FaCloudUploadAlt } from "react-icons/fa";
 import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
 import { fileToChunks } from "@/utils/fileUtils";
-import Result from "@/pages/Home/components/Result";
 import { useBackend } from "@/hooks/useBackend";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { useNavigate } from "react-router-dom";
 
 const Home = () => {
    const [file, setFile] = useState<File | null>(null);
-   const [videoUrl, setVideoUrl] = useState("");
-   const [result, setResult] = useState<string>("");
    const [uploading, setUploading] = useState(false);
    const [uploadProgress, setUploadProgress] = useState(0);
-   const [uploadStatus, setUploadStatus] = useState(""); // 'idle', 'uploading', 'processing', 'complete', 'error'
+   const [uploadStatus, setUploadStatus] = useState<
+      "idle" | "uploading" | "processing" | "complete" | "error"
+   >("idle"); // 'idle', 'uploading', 'processing', 'complete', 'error'
 
    const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -106,7 +105,7 @@ const Home = () => {
          };
 
          // Upload chunks in parallel batches for better performance
-         const BATCH_SIZE = 5; // Upload 3 chunks simultaneously
+         const BATCH_SIZE = 5; // Upload 5 chunks simultaneously
 
          for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
             const batch = chunks.slice(
@@ -157,7 +156,7 @@ const Home = () => {
          if ("Err" in completeResult) throw new Error(completeResult.Err);
          const fileId = completeResult.Ok;
 
-         console.log("UploadedFile", fileId);
+         console.log("fileId", fileId);
 
          // Start transcription
          console.log("Starting transcription...");
@@ -168,6 +167,8 @@ const Home = () => {
             throw new Error(startTranscribeJob.Err);
          }
          const transcribeJobId = startTranscribeJob.Ok;
+
+         console.log('transcribeJobId', transcribeJobId)
 
          // Optimized polling with exponential backoff
          let pollInterval = 2000; // Start with 2 seconds
@@ -192,7 +193,7 @@ const Home = () => {
             }
 
             if ("Completed" in status) {
-               console.log("✅ Transcription completed");
+               console.log(`✅ Transcription completed: ${status.Completed}`);
                break;
             }
 
@@ -206,11 +207,12 @@ const Home = () => {
          const transcriptionResult = await backend.get_transcription_result(
             transcribeJobId
          );
-         console.log("Transcription result:", transcriptionResult);
-
+         
          if ("Err" in transcriptionResult) {
             throw new Error(transcriptionResult.Err);
          }
+
+         console.log("Transcription result:", transcriptionResult.Ok);
 
          // Start summarization
          console.log("Starting summarization...");
@@ -249,34 +251,27 @@ const Home = () => {
             }
          }
 
-         console.log("Summary result", fileArtifact);
+         console.log("Summary result:", fileArtifact);
          console.log("Summary completed");
 
          setUploadProgress(100);
          setUploadStatus("complete");
-         setResult(fileArtifact!);
 
          setSnackbar({
             message: "File processed successfully!",
          });
 
          const url = URL.createObjectURL(file);
-         setVideoUrl(url);
 
          navigate(`/works/${fileId}`, {
             state: {
                videoUrl: url,
-               summary: fileArtifact,
-               filename: file.name,
-               fileSize: file.size,
-               fileType: file.type,
+               // summary: fileArtifact,
+               // filename: file.name,
+               // fileSize: file.size,
+               // fileType: file.type,
             },
          });
-
-         // Smooth scroll to results
-         setTimeout(() => {
-            window.scrollTo({ behavior: "smooth", top: 1000 });
-         }, 500);
       } catch (error: any) {
          console.error("Upload error:", error);
          setUploadStatus("error");
@@ -477,14 +472,6 @@ const Home = () => {
                   </Box>
                </Box>
             </Box>
-
-            {uploadStatus === "complete" && videoUrl && (
-               <Result
-                  videoUrl={videoUrl}
-                  type={file?.type || ""}
-                  summary={result}
-               />
-            )}
          </Box>
       </>
    );

@@ -1,20 +1,92 @@
+import EmptyState from "@/components/EmptyState";
+import SkeletonWorkCard from "@/components/SkeletonWorkCard";
 import WorkCard from "@/components/WorkCard";
-import { languageOptions, typeOptions } from "@/data/options";
-import { works } from "@/data/work";
-import { Box, Button, ListItemText, Menu, MenuItem } from "@mui/material";
-import { useState } from "react";
+import { languageOptions, fileTypeOptions } from "@/data/options";
+import { useBackend } from "@/hooks/useBackend";
+import { useSnackbarStore } from "@/store/useSnackbarStore";
+import { getFileTypeFilter, getLanguageFilter } from "@/utils/getFilter";
+import {
+   Box,
+   Button,
+   debounce,
+   ListItemText,
+   Menu,
+   MenuItem,
+} from "@mui/material";
+import {
+   FileArtifact,
+   FileArtifactFilter,
+} from "declarations/backend/backend.did";
+import { useEffect, useMemo, useState } from "react";
 import { MdCheck, MdChevronRight, MdSearch } from "react-icons/md";
 
 const Explore = () => {
-   const [qs, setQs] = useState({
-      search: "",
-      type: "",
-      language: "",
-   });
    const [anchorTypeEl, setAnchorTypeEl] = useState<null | HTMLElement>(null);
    const [anchorLanguageEl, setAnchorLanguageEl] = useState<null | HTMLElement>(
       null
    );
+
+   const [works, setWorks] = useState<FileArtifact[]>([]);
+   const [loading, setLoading] = useState(true);
+
+   const [searchInput, setSearchInput] = useState("");
+   const [filter, setFilter] = useState<FileArtifactFilter>({
+      file_type: [],
+      language: [],
+      search: [],
+      sort: [{ Newest: null }],
+   });
+
+   const debouncedSearch = debounce((q: string) => {
+      setFilter((p) => ({ ...p, search: [q] }));
+   }, 500);
+
+   const backend = useBackend();
+   const setSnackbar = useSnackbarStore((s) => s.setSnackbar);
+
+   const handleResetFilter = () => {
+      setSearchInput("");
+      setFilter({
+         file_type: [],
+         language: [],
+         search: [],
+         sort: filter.sort,
+      });
+   };
+
+   const handleListFileArtifacts = async () => {
+      setLoading(true);
+      try {
+         const fileArtifacts = await backend.search_file_artifacts([filter]);
+         setWorks(fileArtifacts);
+         console.log("fileArtifacts", fileArtifacts);
+      } catch (error: any) {
+         setSnackbar({ message: error.message });
+      }
+      setLoading(false);
+   };
+
+   const hasFilters = useMemo(
+      () =>
+         Boolean(
+            filter.search.length ||
+               filter.language.length ||
+               filter.file_type.length ||
+               filter.language.length
+         ),
+      [filter]
+   );
+
+   const getEmptyStateType = () => {
+      if (hasFilters) {
+         return "no-results";
+      }
+      return "no-data";
+   };
+
+   useEffect(() => {
+      handleListFileArtifacts();
+   }, [filter]);
 
    const openType = Boolean(anchorTypeEl);
    const openLanguage = Boolean(anchorLanguageEl);
@@ -34,8 +106,11 @@ const Explore = () => {
                type="text"
                className="rounded-full bg-white focus:outline outline-primary text-xl w-full px-7 py-3 max-w-[800px] mx-auto block text-background"
                placeholder="Search..."
-               value={qs.search}
-               onChange={(e) => setQs({ ...qs, search: e.target.value })}
+               value={searchInput}
+               onChange={(e) => {
+                  setSearchInput(e.target.value);
+                  debouncedSearch(e.target.value);
+               }}
             />
 
             <Box className="flex justify-center gap-4">
@@ -44,8 +119,10 @@ const Explore = () => {
                   color="inherit"
                   onClick={(e) => setAnchorTypeEl(e.currentTarget)}
                >
-                  {qs.type
-                     ? typeOptions.find((opt) => qs.type == opt.value)?.label
+                  {filter.file_type[0]
+                     ? fileTypeOptions.find(
+                          (opt) => opt.value in filter.file_type[0]!
+                       )?.label
                      : "Type"}
                   <MdChevronRight className="rotate-90 text-base" />
                </Button>
@@ -60,11 +137,14 @@ const Explore = () => {
                      },
                   }}
                >
-                  {typeOptions.map((opt) => (
+                  {fileTypeOptions.map((opt) => (
                      <MenuItem
                         key={opt.label}
                         onClick={() => {
-                           setQs({ ...qs, type: opt.value });
+                           setFilter((p) => ({
+                              ...p,
+                              file_type: getFileTypeFilter(opt.value),
+                           }));
                            setAnchorTypeEl(null);
                         }}
                      >
@@ -78,7 +158,8 @@ const Explore = () => {
                         <Box className="ml-5">
                            <MdCheck
                               className={`${
-                                 qs.type == opt.value
+                                 filter.file_type.length &&
+                                 opt.value in filter.file_type[0]!
                                     ? "opacity-100"
                                     : "opacity-0"
                               }`}
@@ -93,9 +174,10 @@ const Explore = () => {
                   color="inherit"
                   onClick={(e) => setAnchorLanguageEl(e.currentTarget)}
                >
-                  {qs.language
-                     ? languageOptions.find((opt) => qs.language == opt.value)
-                          ?.label
+                  {filter.language[0]
+                     ? languageOptions.find(
+                          (opt) => opt.value in filter.language[0]!
+                       )?.label
                      : "Language"}
                   <MdChevronRight className="rotate-90 text-base" />
                </Button>
@@ -114,7 +196,10 @@ const Explore = () => {
                      <MenuItem
                         key={opt.label}
                         onClick={() => {
-                           setQs({ ...qs, language: opt.value });
+                           setFilter((p) => ({
+                              ...p,
+                              language: getLanguageFilter(opt.value),
+                           }));
                            setAnchorLanguageEl(null);
                         }}
                      >
@@ -128,7 +213,8 @@ const Explore = () => {
                         <Box className="ml-5">
                            <MdCheck
                               className={`${
-                                 qs.language == opt.value
+                                 filter.language.length &&
+                                 opt.value in filter.language[0]!
                                     ? "opacity-100"
                                     : "opacity-0"
                               }`}
@@ -140,9 +226,22 @@ const Explore = () => {
             </Box>
 
             <Box className="grid grid-cols-3 gap-4">
-               {works.map((w) => (
-                  <WorkCard key={w.id} work={w} isExplore />
-               ))}
+               {loading ? (
+                  Array.from({ length: 6 }).map((_, idx) => (
+                     <SkeletonWorkCard key={idx} isExplore />
+                  ))
+               ) : !works.length ? (
+                  <EmptyState
+                     type={getEmptyStateType()}
+                     searchTerm={filter.search[0]}
+                     hasFilters={hasFilters}
+                     onReset={handleResetFilter}
+                  />
+               ) : (
+                  works.map((w) => (
+                     <WorkCard key={w.file_id} work={w} isExplore />
+                  ))
+               )}
             </Box>
          </Box>
       </Box>

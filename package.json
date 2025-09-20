@@ -9,8 +9,5 @@
   "type": "module",
   "workspaces": [
     "src/frontend"
-  ],
-  "dependencies": {
-    "use-debounce": "^10.0.5"
-  }
+  ]
 }

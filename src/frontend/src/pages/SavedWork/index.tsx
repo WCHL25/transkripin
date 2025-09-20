@@ -1,10 +1,19 @@
+import EmptyState from "@/components/EmptyState";
+import SkeletonWorkCard from "@/components/SkeletonWorkCard";
 import WorkCard from "@/components/WorkCard";
-import { languageOptions, sortOptions, typeOptions } from "@/data/options";
-import { works } from "@/data/work";
+import { languageOptions, sortOptions, fileTypeOptions } from "@/data/options";
+import { useBackend } from "@/hooks/useBackend";
+import { useSnackbarStore } from "@/store/useSnackbarStore";
+import {
+   getFileTypeFilter,
+   getLanguageFilter,
+   getSortFilter,
+} from "@/utils/getFilter";
 import {
    Badge,
    Box,
    Button,
+   debounce,
    FormControlLabel,
    ListItemText,
    Menu,
@@ -14,7 +23,11 @@ import {
    Tab,
    Tabs,
 } from "@mui/material";
-import { useState } from "react";
+import {
+   FileArtifact,
+   FileArtifactFilter,
+} from "declarations/backend/backend.did";
+import { useEffect, useMemo, useState } from "react";
 import {
    MdCheck,
    MdChevronRight,
@@ -24,25 +37,111 @@ import {
 } from "react-icons/md";
 
 const SavedWork = () => {
-   const [selectedTab, setSelectedTab] = useState(0);
-   const [qs, setQs] = useState({
-      search: "",
-      sortBy: "updated_at",
-      sort: "desc",
-      type: "",
-      language: "",
-   });
+   const [selectedTab, setSelectedTab] = useState<"myWork" | "savedWork">(
+      "myWork"
+   );
    const [anchorSortEl, setAnchorSortEl] = useState<null | HTMLElement>(null);
    const [anchorFilterEl, setAnchorFilterEl] = useState<null | HTMLElement>(
       null
    );
+   const [searchInput, setSearchInput] = useState("");
+   const [filter, setFilter] = useState<FileArtifactFilter>({
+      file_type: [],
+      language: [],
+      search: [],
+      sort: [{ Newest: null }],
+   });
+
+   const [works, setWorks] = useState<FileArtifact[]>([]);
+
+   const debouncedSearch = debounce((q: string) => {
+      setFilter((p) => ({ ...p, search: [q] }));
+   }, 500);
+
+   const [loading, setLoading] = useState(true);
+
+   const backend = useBackend();
+   const setSnackbar = useSnackbarStore((s) => s.setSnackbar);
 
    const openSort = Boolean(anchorSortEl);
    const openFilter = Boolean(anchorFilterEl);
 
-   const handleChange = (_: React.SyntheticEvent, newValue: number) => {
+   const handleChangeTab = (
+      _: React.SyntheticEvent,
+      newValue: "myWork" | "savedWork"
+   ) => {
       setSelectedTab(newValue);
    };
+
+   const handleListUserFiles = async () => {
+      setLoading(true);
+      try {
+         const listUserFiles = await backend.list_user_file_artifacts([filter]);
+         setWorks(listUserFiles);
+         console.log("listUserFiles", listUserFiles);
+      } catch (error: any) {
+         setSnackbar({ message: error.message });
+      }
+
+      setLoading(false);
+   };
+
+   const handleListSavedFiles = async () => {
+      setLoading(true);
+      try {
+         const listSavedFiles = await backend.list_saved_file_artifacts([
+            filter,
+         ]);
+         setWorks(listSavedFiles);
+         console.log("listSavedFiles", listSavedFiles);
+      } catch (error: any) {
+         setSnackbar({ message: error.message });
+      }
+
+      setLoading(false);
+   };
+
+   const hasFilters = useMemo(
+      () =>
+         Boolean(
+            filter.search.length ||
+               filter.language.length ||
+               filter.file_type.length ||
+               filter.language.length
+         ),
+      [filter]
+   );
+
+   const handleResetFilter = () => {
+      setSearchInput("");
+      setFilter({
+         file_type: [],
+         language: [],
+         search: [],
+         sort: filter.sort,
+      });
+   };
+
+   const getEmptyStateType = () => {
+      if (hasFilters) {
+         return "no-results";
+      }
+      if (selectedTab === "myWork") {
+         return "no-saved";
+      }
+      return "no-data";
+   };
+
+   useEffect(() => {
+      switch (selectedTab) {
+         case "myWork":
+            handleListUserFiles();
+            break;
+         case "savedWork":
+            handleListSavedFiles();
+            break;
+      }
+   }, [selectedTab, filter]);
 
    return (
       <Box
@@ -52,7 +151,7 @@ const SavedWork = () => {
          <Box className="flex items-center justify-between gap-5 mb-6">
             <Tabs
                value={selectedTab}
-               onChange={handleChange}
+               onChange={handleChangeTab}
                className="bg-background rounded-full border-background3 border overflow-hidden min-h-0"
                sx={{
                   "& .MuiTabs-indicator": {
@@ -65,10 +164,12 @@ const SavedWork = () => {
                <Tab
                   label="My Work"
                   className="px-6 py-3 text-foreground font-semibold z-10 rounded-full min-h-0"
+                  value={"myWork"}
                />
                <Tab
-                  label="Saved Work"
+                  label="Bookmark"
                   className="px-6 py-3 text-foreground font-semibold z-10 rounded-full min-h-0"
+                  value={"savedWork"}
                />
             </Tabs>
 
@@ -79,13 +180,18 @@ const SavedWork = () => {
                      type="text"
                      placeholder="Search"
                      className="bg-foreground text-background py-3 px-4 pl-9 rounded-lg focus:outline-2 outline-primary"
-                     value={qs.search}
-                     onChange={(e) => setQs({ ...qs, search: e.target.value })}
+                     value={searchInput}
+                     onChange={(e) => {
+                        setSearchInput(e.target.value);
+                        debouncedSearch(e.target.value);
+                     }}
                   />
                </Box>
 
                <Badge
-                  badgeContent={(qs.type ? 1 : 0) + (qs.language ? 1 : 0)}
+                  badgeContent={
+                     filter.file_type.length + filter.language.length
+                  }
                   color="primary"
                   overlap="circular"
                >
@@ -114,11 +220,15 @@ const SavedWork = () => {
                         <RadioGroup
                            name="type"
                            onChange={(e) =>
-                              setQs({ ...qs, type: e.target.value })
+                              setFilter((p) => ({
+                                 ...p,
+                                 file_type: getFileTypeFilter(e.target.value),
+                              }))
                            }
                         >
-                           {typeOptions.map((opt) => (
+                           {fileTypeOptions.map((opt) => (
                               <FormControlLabel
+                                 key={opt.value}
                                  value={opt.value}
                                  control={<Radio size="small" />}
                                  label={opt.label}
@@ -131,11 +241,15 @@ const SavedWork = () => {
                         <RadioGroup
                            name="language"
                            onChange={(e) =>
-                              setQs({ ...qs, language: e.target.value })
+                              setFilter((p) => ({
+                                 ...p,
+                                 language: getLanguageFilter(e.target.value),
+                              }))
                            }
                         >
                            {languageOptions.map((opt) => (
                               <FormControlLabel
+                                 key={opt.value}
                                  value={opt.value}
                                  control={<Radio size="small" />}
                                  label={opt.label}
@@ -152,13 +266,9 @@ const SavedWork = () => {
                   onClick={(e) => setAnchorSortEl(e.currentTarget)}
                >
                   <MdSort className="text-2xl" />
-                  {
-                     sortOptions.find(
-                        (opt) =>
-                           qs.sort == opt.value.sort &&
-                           qs.sortBy == opt.value.sortBy
-                     )?.label
-                  }
+                  {filter.sort[0] &&
+                     sortOptions.find((opt) => opt.value in filter.sort[0]!)
+                        ?.label}
                   <MdChevronRight className="rotate-90 text-base" />
                </Button>
 
@@ -176,7 +286,10 @@ const SavedWork = () => {
                      <MenuItem
                         key={opt.label}
                         onClick={() => {
-                           setQs({ ...qs, ...opt.value });
+                           setFilter((p) => ({
+                              ...p,
+                              sort: getSortFilter(opt.value),
+                           }));
                            setAnchorSortEl(null);
                         }}
                      >
@@ -190,8 +303,8 @@ const SavedWork = () => {
                         <Box className="ml-5">
                            <MdCheck
                               className={`${
-                                 qs.sort == opt.value.sort &&
-                                 qs.sortBy == opt.value.sortBy
+                                 filter.sort.length &&
+                                 opt.value in filter.sort[0]!
                                     ? "opacity-100"
                                     : "opacity-0"
                               }`}
@@ -204,9 +317,20 @@ const SavedWork = () => {
          </Box>
 
          <Box className="grid grid-cols-3 gap-4">
-            {works.map((w) => (
-               <WorkCard key={w.id} work={w} />
-            ))}
+            {loading ? (
+               Array.from({ length: 6 }).map((_, idx) => (
+                  <SkeletonWorkCard key={idx} />
+               ))
+            ) : !works.length ? (
+               <EmptyState
+                  type={getEmptyStateType()}
+                  searchTerm={filter.search[0]}
+                  hasFilters={hasFilters}
+                  onReset={handleResetFilter}
+               />
+            ) : (
+               works.map((w) => <WorkCard key={w.file_id} work={w} />)
+            )}
          </Box>
       </Box>
    );

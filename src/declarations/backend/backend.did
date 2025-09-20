@@ -88,9 +88,7 @@ type UploadedFile = record {
 service : () -> {
   complete_upload : (text) -> (Result);
   delete_file : (text) -> (Result);
-  // Delete a file artifact
   delete_file_artifact : (text) -> (Result_1);
-  // Update a file artifact
   edit_file_artifact : (FileArtifactRequest) -> (Result_2);
   get_file : (text) -> (Result_3) query;
   // Query a file artifact with bookmark info for the caller
@@ -103,11 +101,9 @@ service : () -> {
   get_upload_status : (text) -> (Result_5) query;
   get_user_id : (principal) -> (text) query;
   list_files : () -> (vec record { text; text; text; nat64 }) query;
-  // List all bookmarked file artifacts for the current caller
   list_saved_file_artifacts : (opt FileArtifactFilter) -> (
       vec FileArtifactWithMeta,
     ) query;
-  // List all file artifact for the current caller
   list_user_file_artifacts : (opt FileArtifactFilter) -> (
       vec FileArtifactWithMeta,
     ) query;
@@ -121,9 +117,7 @@ service : () -> {
   start_summarization : (text) -> (Result);
   start_transcription : (text) -> (Result);
   start_upload : (StartUploadRequest) -> (Result);
-  // Bookmark a file artifact
   toggle_file_artifact_bookmark : (text) -> (Result);
-  // Toggle visibility of a file artifact
   toggle_file_artifact_visibility : (text) -> (Result);
   upload_chunk : (UploadChunkRequest) -> (Result);
 }
