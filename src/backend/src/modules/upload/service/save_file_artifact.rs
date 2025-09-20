@@ -1,7 +1,6 @@
 use crate::{
     modules::{
-        upload::domain::entities::{ FileArtifact, FileArtifactRequest },
-        FileArtifactVisibility,
+        upload::domain::entities::{ FileArtifact, FileArtifactRequest, FileArtifactVisibility },
     },
     FILE_ARTIFACTS,
     UPLOADED_FILES,

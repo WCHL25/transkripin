@@ -24,6 +24,10 @@ type FileArtifactRequest = record {
   file_id : text;
 };
 type FileArtifactVisibility = variant { Private; Public };
+type FileArtifactWithMeta = record {
+  artifact : FileArtifact;
+  is_bookmarked : bool;
+};
 type FileTypeFilter = variant { Audio; Video };
 type JobStatus = variant { Failed : text; Completed : text; Pending };
 type LanguageFilter = variant { English; Indonesia };
@@ -89,8 +93,8 @@ service : () -> {
   // Update a file artifact
   edit_file_artifact : (FileArtifactRequest) -> (Result_2);
   get_file : (text) -> (Result_3) query;
-  // Query a file artifact
-  get_file_artifact : (text) -> (opt FileArtifact) query;
+  // Query a file artifact with bookmark info for the caller
+  get_file_artifact : (text) -> (opt FileArtifactWithMeta) query;
   // Query a summary result
   get_summary_result : (text) -> (JobStatus) query;
   get_transcription : (text) -> (Result) query;
@@ -101,16 +105,18 @@ service : () -> {
   list_files : () -> (vec record { text; text; text; nat64 }) query;
   // List all bookmarked file artifacts for the current caller
   list_saved_file_artifacts : (opt FileArtifactFilter) -> (
-      vec FileArtifact,
+      vec FileArtifactWithMeta,
     ) query;
   // List all file artifact for the current caller
   list_user_file_artifacts : (opt FileArtifactFilter) -> (
-      vec FileArtifact,
+      vec FileArtifactWithMeta,
     ) query;
   login : () -> (text);
   logout : () -> (text);
   // Search all file artifacts
-  search_file_artifacts : (opt FileArtifactFilter) -> (vec FileArtifact) query;
+  search_file_artifacts : (opt FileArtifactFilter) -> (
+      vec FileArtifactWithMeta,
+    ) query;
   // Start the summarization process
   start_summarization : (text) -> (Result);
   start_transcription : (text) -> (Result);

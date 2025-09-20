@@ -8,14 +8,15 @@ use crate::{
             domain::entities::{
                 Bookmark,
                 FileArtifact,
-                FileArtifactRequest,
                 FileArtifactFilter,
+                FileArtifactRequest,
                 FileArtifactVisibility,
+                FileArtifactWithMeta,
+                JobStatus,
                 LlmResponse,
                 Summary,
-                JobStatus,
             },
-            service::{ call_ollama, save_file_artifact, filter_file_artifacts },
+            service::{ call_ollama, save_file_artifact, fetch_file_artifacts_with_bookmark },
         },
     },
     BOOKMARKS,
@@ -142,10 +143,27 @@ pub fn get_summary_result(file_id: String) -> JobStatus {
         .unwrap_or(JobStatus::Pending)
 }
 
-/// Query a file artifact
+/// Query a file artifact with bookmark info for the caller
 #[query]
-pub fn get_file_artifact(file_id: String) -> Option<FileArtifact> {
-    FILE_ARTIFACTS.with(|map| map.borrow().get(&file_id))
+pub fn get_file_artifact(file_id: String) -> Option<FileArtifactWithMeta> {
+    let caller = ic_cdk::api::caller();
+
+    FILE_ARTIFACTS.with(|map| {
+        map.borrow()
+            .get(&file_id)
+            .map(|artifact| {
+                let is_bookmarked = BOOKMARKS.with(|bookmarks| {
+                    let store = bookmarks.borrow();
+                    let key = &(Bookmark {
+                        user: caller,
+                        file_id: artifact.file_id.clone(),
+                    });
+                    store.contains_key(key)
+                });
+
+                FileArtifactWithMeta { artifact, is_bookmarked }
+            })
+    })
 }
 
 /// Update a file artifact
@@ -210,62 +228,36 @@ pub fn delete_file_artifact(file_id: String) -> Result<(), String> {
 
 /// List all file artifact for the current caller
 #[query]
-pub fn list_user_file_artifacts(filter: Option<FileArtifactFilter>) -> Vec<FileArtifact> {
+pub fn list_user_file_artifacts(filter: Option<FileArtifactFilter>) -> Vec<FileArtifactWithMeta> {
     let caller = ic_cdk::api::caller();
 
-    // Get all file artifacts for the current caller
-    let artifacts: Vec<FileArtifact> = FILE_ARTIFACTS.with(|results| {
-        results
-            .borrow()
-            .values()
-            .filter(|r| r.owner == caller)
-            .collect()
-    });
-
-    filter_file_artifacts(artifacts, filter)
+    fetch_file_artifacts_with_bookmark(|artifact| artifact.owner == caller, filter)
 }
 
 /// List all bookmarked file artifacts for the current caller
 #[query]
-pub fn list_saved_file_artifacts(filter: Option<FileArtifactFilter>) -> Vec<FileArtifact> {
+pub fn list_saved_file_artifacts(filter: Option<FileArtifactFilter>) -> Vec<FileArtifactWithMeta> {
     let caller = ic_cdk::api::caller();
 
-    let artifacts: Vec<FileArtifact> = BOOKMARKS.with(|bookmarks| {
-        let bookmarks = bookmarks.borrow();
-        let file_ids: Vec<String> = bookmarks
-            .keys()
-            .filter(|key| key.user == caller)
-            .map(|key| key.file_id.clone())
-            .collect();
+    fetch_file_artifacts_with_bookmark(|artifact| {
+        let key = &(Bookmark {
+            user: caller,
+            file_id: artifact.file_id.clone(),
+        });
 
-        FILE_ARTIFACTS.with(|artifacts| {
-            let artifacts = artifacts.borrow();
-            file_ids
-                .into_iter()
-                .filter_map(|fid| artifacts.get(&fid))
-                .filter(|artifact| { artifact.visibility.is_public() || artifact.owner == caller })
-                .collect()
-        })
-    });
-
-    filter_file_artifacts(artifacts, filter)
+        BOOKMARKS.with(|b| b.borrow().contains_key(key))
+    }, filter)
 }
 
 /// Search all file artifacts
 #[query]
-pub fn search_file_artifacts(filter: Option<FileArtifactFilter>) -> Vec<FileArtifact> {
+pub fn search_file_artifacts(filter: Option<FileArtifactFilter>) -> Vec<FileArtifactWithMeta> {
     let caller = ic_cdk::api::caller();
 
-    // Collect all artifacts that are public OR owned by caller
-    let artifacts: Vec<FileArtifact> = FILE_ARTIFACTS.with(|results| {
-        results
-            .borrow()
-            .values()
-            .filter(|r| { r.visibility.is_public() || r.owner == caller })
-            .collect()
-    });
-
-    filter_file_artifacts(artifacts, filter)
+    fetch_file_artifacts_with_bookmark(
+        |artifact| (artifact.visibility.is_public() || artifact.owner == caller),
+        filter
+    )
 }
 
 /// Toggle visibility of a file artifact

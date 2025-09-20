@@ -29,6 +29,10 @@ export interface FileArtifactRequest {
 }
 export type FileArtifactVisibility = { 'Private' : null } |
   { 'Public' : null };
+export interface FileArtifactWithMeta {
+  'artifact' : FileArtifact,
+  'is_bookmarked' : boolean,
+}
 export type FileTypeFilter = { 'Audio' : null } |
   { 'Video' : null };
 export type JobStatus = { 'Failed' : string } |
@@ -100,7 +104,7 @@ export interface _SERVICE {
   'delete_file_artifact' : ActorMethod<[string], Result_1>,
   'edit_file_artifact' : ActorMethod<[FileArtifactRequest], Result_2>,
   'get_file' : ActorMethod<[string], Result_3>,
-  'get_file_artifact' : ActorMethod<[string], [] | [FileArtifact]>,
+  'get_file_artifact' : ActorMethod<[string], [] | [FileArtifactWithMeta]>,
   'get_summary_result' : ActorMethod<[string], JobStatus>,
   'get_transcription' : ActorMethod<[string], Result>,
   'get_transcription_result' : ActorMethod<[string], Result>,
@@ -110,17 +114,17 @@ export interface _SERVICE {
   'list_files' : ActorMethod<[], Array<[string, string, string, bigint]>>,
   'list_saved_file_artifacts' : ActorMethod<
     [[] | [FileArtifactFilter]],
-    Array<FileArtifact>
+    Array<FileArtifactWithMeta>
   >,
   'list_user_file_artifacts' : ActorMethod<
     [[] | [FileArtifactFilter]],
-    Array<FileArtifact>
+    Array<FileArtifactWithMeta>
   >,
   'login' : ActorMethod<[], string>,
   'logout' : ActorMethod<[], string>,
   'search_file_artifacts' : ActorMethod<
     [[] | [FileArtifactFilter]],
-    Array<FileArtifact>
+    Array<FileArtifactWithMeta>
   >,
   'start_summarization' : ActorMethod<[string], Result>,
   'start_transcription' : ActorMethod<[string], Result>,

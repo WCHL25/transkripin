@@ -57,6 +57,10 @@ export const idlFactory = ({ IDL }) => {
     'deleted_at' : IDL.Opt(IDL.Nat64),
   });
   const Result_3 = IDL.Variant({ 'Ok' : UploadedFile, 'Err' : IDL.Text });
+  const FileArtifactWithMeta = IDL.Record({
+    'artifact' : FileArtifact,
+    'is_bookmarked' : IDL.Bool,
+  });
   const JobStatus = IDL.Variant({
     'Failed' : IDL.Text,
     'Completed' : IDL.Text,
@@ -106,7 +110,7 @@ export const idlFactory = ({ IDL }) => {
     'get_file' : IDL.Func([IDL.Text], [Result_3], ['query']),
     'get_file_artifact' : IDL.Func(
         [IDL.Text],
-        [IDL.Opt(FileArtifact)],
+        [IDL.Opt(FileArtifactWithMeta)],
         ['query'],
       ),
     'get_summary_result' : IDL.Func([IDL.Text], [JobStatus], ['query']),
@@ -122,19 +126,19 @@ export const idlFactory = ({ IDL }) => {
       ),
     'list_saved_file_artifacts' : IDL.Func(
         [IDL.Opt(FileArtifactFilter)],
-        [IDL.Vec(FileArtifact)],
+        [IDL.Vec(FileArtifactWithMeta)],
         ['query'],
       ),
     'list_user_file_artifacts' : IDL.Func(
         [IDL.Opt(FileArtifactFilter)],
-        [IDL.Vec(FileArtifact)],
+        [IDL.Vec(FileArtifactWithMeta)],
         ['query'],
       ),
     'login' : IDL.Func([], [IDL.Text], []),
     'logout' : IDL.Func([], [IDL.Text], []),
     'search_file_artifacts' : IDL.Func(
         [IDL.Opt(FileArtifactFilter)],
-        [IDL.Vec(FileArtifact)],
+        [IDL.Vec(FileArtifactWithMeta)],
         ['query'],
       ),
     'start_summarization' : IDL.Func([IDL.Text], [Result], []),
