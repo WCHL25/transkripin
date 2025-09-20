@@ -66,11 +66,18 @@ export interface Summary {
 }
 export interface Transcription {
   'text' : string,
+  'segments' : Array<TranscriptionSegment>,
   'created_at' : bigint,
   'language' : string,
   'job_id' : string,
   'deleted_at' : [] | [bigint],
   'file_id' : string,
+}
+export interface TranscriptionSegment {
+  'id' : number,
+  'end' : number,
+  'text' : string,
+  'start' : number,
 }
 export interface UploadChunkRequest {
   'chunk_index' : bigint,
