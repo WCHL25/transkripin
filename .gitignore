@@ -33,7 +33,7 @@ uploads/
 .devcontainer/
 
 
-ggml-base.en.bin
-ggml-base.en.bin.*
+ggml-base.bin
+ggml-base.bin.*
 
 dist/

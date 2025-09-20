@@ -67,7 +67,7 @@ You can download it directly from Hugging Face.
 cd src/transcribe/assets/models
 
 # Download the model
-wget https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
+wget https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
 ```
 
 ---

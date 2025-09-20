@@ -1,20 +1,13 @@
 use axum::{ extract::{ Multipart, Path }, routing::{ post, get }, Router, Json };
 use serde::{ Serialize, Deserialize };
-use std::{
-    collections::HashMap,
-    fs,
-    io::Write,
-    net::SocketAddr,
-    path::PathBuf,
-    time::Duration,
-    sync::Mutex,
-};
+use std::{ collections::HashMap, net::SocketAddr, time::Duration, sync::{ Arc, Mutex } };
 use tower_http::timeout::TimeoutLayer;
 use once_cell::sync::Lazy;
 use tokio::task;
 
 mod modules;
-use modules::whisper;
+
+use modules::*;
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(tag = "status", content = "data")]
@@ -26,23 +19,17 @@ enum JobStatus {
 
 static JOBS: Lazy<Mutex<HashMap<String, JobStatus>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
-#[derive(Serialize)]
-struct UploadResponse {
-    message: String,
-}
-
-#[derive(Serialize)]
-struct TranscriptionResponse {
-    text: String,
-}
+static UPLOAD_SESSIONS: Lazy<Arc<Mutex<HashMap<String, Vec<Vec<u8>>>>>> = Lazy::new(||
+    Arc::new(Mutex::new(HashMap::new()))
+);
 
 #[tokio::main]
 async fn main() {
     let app = Router::new()
         .route("/upload_chunk", post(upload_chunk))
         .route("/finalize_upload", post(finalize_upload))
-        .route("/status/{job_id}", get(check_status))
-        .route("/result/{job_id}", get(get_result))
+        .route("/status/{job_id}", get(check_job_status))
+        .route("/result/{job_id}", get(transcription_result))
         .layer(TimeoutLayer::new(Duration::from_secs(120)));
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
@@ -51,7 +38,7 @@ async fn main() {
     axum::serve(tokio::net::TcpListener::bind(addr).await.unwrap(), app).await.unwrap();
 }
 
-async fn upload_chunk(mut multipart: Multipart) -> String {
+pub async fn upload_chunk(mut multipart: Multipart) -> String {
     let mut session_id = String::new();
     let mut chunk_index = 0;
     let mut chunk_data = Vec::new();
@@ -74,17 +61,17 @@ async fn upload_chunk(mut multipart: Multipart) -> String {
         }
     }
 
-    let dir = PathBuf::from("uploads").join(&session_id);
-    fs::create_dir_all(&dir).unwrap();
-    let chunk_path = dir.join(format!("chunk_{:04}.part", chunk_index));
-
-    let mut file = fs::File::create(chunk_path).unwrap();
-    file.write_all(&chunk_data).unwrap();
+    let mut sessions = UPLOAD_SESSIONS.lock().unwrap();
+    let entry = sessions.entry(session_id.clone()).or_default();
+    if entry.len() <= chunk_index {
+        entry.resize(chunk_index + 1, Vec::new());
+    }
+    entry[chunk_index] = chunk_data;
 
     format!("Chunk {} for session {} uploaded", chunk_index, session_id)
 }
 
-async fn finalize_upload(Json(data): Json<serde_json::Value>) -> Json<UploadResponse> {
+pub async fn finalize_upload(Json(data): Json<serde_json::Value>) -> Json<UploadResponse> {
     let session_id = data["session_id"].as_str().unwrap().to_string();
     let job_id = uuid::Uuid::new_v4().to_string();
     let job_id_clone = job_id.clone();
@@ -95,43 +82,34 @@ async fn finalize_upload(Json(data): Json<serde_json::Value>) -> Json<UploadResp
     }
 
     task::spawn(async move {
-        let dir = PathBuf::from("uploads").join(&session_id);
+        // Take chunks out while holding the lock, then drop lock
+        let chunks = {
+            let mut sessions = UPLOAD_SESSIONS.lock().unwrap();
+            sessions.remove(&session_id)
+        };
 
-        let mut combined = Vec::new();
-        let mut chunk_files: Vec<_> = fs
-            ::read_dir(&dir)
-            .unwrap()
-            .map(|f| f.unwrap().path())
-            .collect();
-
-        chunk_files.sort_by_key(|p| {
-            p.file_name()
-                .unwrap()
-                .to_string_lossy()
-                .trim_start_matches("chunk_")
-                .trim_end_matches(".part")
-                .parse::<u32>()
-                .unwrap_or(0)
-        });
-
-        for path in &chunk_files {
-            let bytes = fs::read(path).unwrap();
-            combined.extend(bytes);
-        }
-
-        if combined.is_empty() {
+        if chunks.is_none() {
             let mut jobs = JOBS.lock().unwrap();
-            jobs.insert(
-                job_id_clone,
-                JobStatus::Failed("No data found after combining chunks.".to_string())
-            );
+            jobs.insert(job_id_clone, JobStatus::Failed("No chunks found".to_string()));
             return;
         }
 
+        let combined: Vec<u8> = chunks.unwrap().into_iter().flatten().collect();
+
+        if combined.is_empty() {
+            let mut jobs = JOBS.lock().unwrap();
+            jobs.insert(job_id_clone, JobStatus::Failed("No data after combining".to_string()));
+            return;
+        }
+
+        // now safe to await
         match whisper::whisper_transcribe(combined).await {
-            Ok(text) => {
+            Ok(result) => {
                 let mut jobs = JOBS.lock().unwrap();
-                jobs.insert(job_id_clone, JobStatus::Completed(text));
+                jobs.insert(
+                    job_id_clone,
+                    JobStatus::Completed(serde_json::to_string(&result).unwrap())
+                );
             }
             Err(e) => {
                 let mut jobs = JOBS.lock().unwrap();
@@ -148,8 +126,8 @@ async fn finalize_upload(Json(data): Json<serde_json::Value>) -> Json<UploadResp
     })
 }
 
-async fn check_status(Path(job_id): Path<String>) -> Json<JobStatus> {
-    let jobs = JOBS.lock().unwrap();
+async fn check_job_status(Path(job_id): Path<String>) -> Json<JobStatus> {
+    let jobs: std::sync::MutexGuard<'_, HashMap<String, JobStatus>> = JOBS.lock().unwrap();
 
     jobs.get(&job_id)
         .cloned()
@@ -157,13 +135,32 @@ async fn check_status(Path(job_id): Path<String>) -> Json<JobStatus> {
         .unwrap_or(Json(JobStatus::Failed("Job not found".to_string())))
 }
 
-async fn get_result(Path(job_id): Path<String>) -> Json<TranscriptionResponse> {
+async fn transcription_result(Path(job_id): Path<String>) -> Json<TranscriptionResponse> {
     let jobs = JOBS.lock().unwrap();
+
     match jobs.get(&job_id) {
-        Some(JobStatus::Completed(text)) => { Json(TranscriptionResponse { text: text.clone() }) }
-        Some(JobStatus::Failed(err)) => {
-            Json(TranscriptionResponse { text: format!("Error: {}", err) })
+        Some(JobStatus::Completed(result_json)) => {
+            // Deserialize stored JSON back into TranscriptionResponse
+            let result: TranscriptionResponse = serde_json
+                ::from_str(result_json)
+                .unwrap_or(TranscriptionResponse {
+                    text: "Failed to parse result".to_string(),
+                    language: "unknown".to_string(),
+                    segments: vec![],
+                });
+            Json(result)
         }
-        _ => Json(TranscriptionResponse { text: "Job is still pending.".to_string() }),
+        Some(JobStatus::Failed(err)) =>
+            Json(TranscriptionResponse {
+                text: format!("Error: {}", err),
+                language: "unknown".to_string(),
+                segments: vec![],
+            }),
+        _ =>
+            Json(TranscriptionResponse {
+                text: "Job is still pending.".to_string(),
+                language: "unknown".to_string(),
+                segments: vec![],
+            }),
     }
 }

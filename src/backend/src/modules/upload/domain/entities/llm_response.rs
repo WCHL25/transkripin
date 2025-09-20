@@ -4,11 +4,9 @@ use serde::{ Deserialize, Serialize };
 use crate::impl_storable;
 
 #[derive(CandidType, Clone, Serialize, Deserialize, Debug)]
-pub struct Summary {
-    pub file_id: String,
-    pub text: String,
-    pub created_at: u64,
-    pub deleted_at: Option<u64>,
+pub struct LlmResponse {
+    pub title: String,
+    pub summary: String,
 }
 
-impl_storable!(Summary);
+impl_storable!(LlmResponse);

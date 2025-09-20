@@ -6,6 +6,10 @@ use tempfile::NamedTempFile;
 use anyhow::{ anyhow, Result };
 use std::io;
 
+pub mod domain;
+
+pub use domain::*;
+
 pub fn extract_audio_from_video(video_data: &[u8]) -> io::Result<Vec<u8>> {
     // Save video data to a temp file
     let mut temp_video = NamedTempFile::new()?;
@@ -37,13 +41,12 @@ pub fn extract_audio_from_video(video_data: &[u8]) -> io::Result<Vec<u8>> {
     Ok(buf)
 }
 
-pub async fn whisper_transcribe(video_data: Vec<u8>) -> Result<String> {
+pub async fn whisper_transcribe(video_data: Vec<u8>) -> Result<TranscriptionResponse> {
     // Convert video to audio
     let audio_wav = extract_audio_from_video(&video_data)?;
-
     let pcm = extract_chunks(&audio_wav);
 
-    let path_to_model = "src/transcribe/assets/models/ggml-base.en.bin";
+    let path_to_model = "src/transcribe/assets/models/ggml-base.bin";
     let ctx = WhisperContext::new_with_params(
         path_to_model,
         WhisperContextParameters::default()
@@ -54,18 +57,47 @@ pub async fn whisper_transcribe(video_data: Vec<u8>) -> Result<String> {
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
     params.set_n_threads(4);
     params.set_translate(false);
-    params.set_language(Some("en"));
+    params.set_language(None); // let whisper auto-detect
 
+    // Run transcription
     state.full(params, &pcm).map_err(|e| anyhow!("Transcription failed: {}", e))?;
 
+    // Extract text + segments
     let num = state.full_n_segments().map_err(|e| anyhow!("Fetching segments failed: {}", e))?;
     let mut text = String::new();
+    let mut segments = Vec::new();
+
+    let lang_id = state.full_lang_id_from_state().unwrap_or(0);
+    let detected_lang = whisper_rs
+        ::get_lang_str(lang_id as i32)
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+
     for i in 0..num {
-        let seg = state.full_get_segment_text(i).unwrap_or_default();
-        text.push_str(&seg);
+        let seg_text = state.full_get_segment_text(i).unwrap_or_default();
+        let start_ms = state.full_get_segment_t0(i).unwrap_or(0);
+        let end_ms = state.full_get_segment_t1(i).unwrap_or(0);
+
+        // Convert ms → seconds
+        let start = (start_ms as f32) / 100.0;
+        let end = (end_ms as f32) / 100.0;
+
+        text.push_str(&seg_text);
         text.push(' ');
+
+        segments.push(TranscriptionSegment {
+            id: i as u32,
+            start,
+            end,
+            text: seg_text,
+        });
     }
-    Ok(text.trim().to_owned())
+
+    Ok(TranscriptionResponse {
+        text: text.trim().to_owned(),
+        language: detected_lang,
+        segments: segments,
+    })
 }
 
 fn extract_chunks(data: &[u8]) -> Vec<f32> {

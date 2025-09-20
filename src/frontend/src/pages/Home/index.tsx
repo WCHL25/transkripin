@@ -164,8 +164,9 @@ const Home = () => {
          setUploadProgress(80);
 
          const startTranscribeJob = await backend.start_transcription(fileId);
-         if ("Err" in startTranscribeJob)
+         if ("Err" in startTranscribeJob) {
             throw new Error(startTranscribeJob.Err);
+         }
          const transcribeJobId = startTranscribeJob.Ok;
 
          // Optimized polling with exponential backoff
@@ -207,8 +208,9 @@ const Home = () => {
          );
          console.log("Transcription result:", transcriptionResult);
 
-         if ("Err" in transcriptionResult)
+         if ("Err" in transcriptionResult) {
             throw new Error(transcriptionResult.Err);
+         }
 
          // Start summarization
          console.log("Starting summarization...");
@@ -219,38 +221,52 @@ const Home = () => {
 
          // Optimized polling for summary
          pollInterval = 1000; // Reset to 1 second for summary
-         let finalResult: string | null = null;
+         let fileArtifact: string | null = null;
 
          while (true) {
+            console.log("Trying to get summary...");
             const summaryResult = await backend.get_summary_result(fileId);
 
-            if ("Ok" in summaryResult) {
-               finalResult = summaryResult.Ok;
+            if ("Pending" in summaryResult) {
+               console.log("⏳ Summary still processing...");
+               await new Promise((resolve) =>
+                  setTimeout(resolve, pollInterval)
+               );
+               pollInterval = Math.min(pollInterval * 1.1, 5000);
+               continue;
+            }
+
+            if ("Completed" in summaryResult) {
+               fileArtifact = summaryResult.Completed;
+               console.log("✅ Summarization completed");
                break;
             }
 
-            await new Promise((resolve) => setTimeout(resolve, pollInterval));
-            pollInterval = Math.min(pollInterval * 1.1, 5000); // Max 5 seconds for summary
+            if ("Failed" in summaryResult) {
+               console.error("❌ Summarization failed:", summaryResult.Failed);
+               fileArtifact = summaryResult.Failed;
+               break;
+            }
          }
 
-         console.log("Summary result", finalResult);
+         console.log("Summary result", fileArtifact);
          console.log("Summary completed");
 
          setUploadProgress(100);
          setUploadStatus("complete");
-         setResult(finalResult!);
+         setResult(fileArtifact!);
 
          setSnackbar({
             message: "File processed successfully!",
          });
 
-         const url = URL.createObjectURL(file)
+         const url = URL.createObjectURL(file);
          setVideoUrl(url);
 
          navigate(`/works/${fileId}`, {
             state: {
                videoUrl: url,
-               summary: finalResult,
+               summary: fileArtifact,
                filename: file.name,
                fileSize: file.size,
                fileType: file.type,
