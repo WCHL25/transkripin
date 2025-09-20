@@ -1,4 +1,6 @@
 pub mod bookmark;
+pub mod download_chunk_request;
+pub mod download_chunk_response;
 pub mod file_artifact_filter;
 pub mod file_artifact_request;
 pub mod file_artifact_visibility;
@@ -18,6 +20,8 @@ pub mod upload_file;
 pub mod upload_session;
 
 pub use bookmark::*;
+pub use download_chunk_request::*;
+pub use download_chunk_response::*;
 pub use file_artifact_filter::*;
 pub use file_artifact_request::*;
 pub use file_artifact_visibility::*;

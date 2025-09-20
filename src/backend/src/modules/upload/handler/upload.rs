@@ -7,6 +7,8 @@ use crate::{
         UploadedFile,
         UploadChunkRequest,
         StartUploadRequest,
+        DownloadChunkRequest,
+        DownloadChunkResponse,
     },
     UPLOADED_FILES,
     UPLOAD_SESSIONS,
@@ -160,17 +162,31 @@ pub fn get_upload_status(session_id: String) -> Result<(u64, u64), String> {
 
 #[query]
 pub fn get_file(file_id: String) -> Result<UploadedFile, String> {
-    let caller = ic_cdk::api::caller();
     UPLOADED_FILES.with(|files| {
         let files = files.borrow();
         match files.get(&file_id) {
-            Some(file) => if file.owner != caller {
-                Err("Unauthorized".to_string())
-            } else {
-                Ok(file.clone())
-            }
+            Some(file) => Ok(file),
             None => Err("File not found".to_string()),
         }
+    })
+}
+
+#[query]
+pub fn get_file_chunk(request: DownloadChunkRequest) -> Result<DownloadChunkResponse, String> {
+    UPLOADED_FILES.with(|files| {
+        let files = files.borrow();
+        let file = files.get(&request.file_id).ok_or_else(|| "File not found".to_string())?;
+
+        let total_size = file.size;
+        let end = std::cmp::min(request.start + request.length, total_size);
+
+        if request.start >= end {
+            return Err("Invalid start position".to_string());
+        }
+
+        let data = file.data[request.start as usize..end as usize].to_vec();
+
+        Ok(DownloadChunkResponse { data, total_size })
     })
 }
 
