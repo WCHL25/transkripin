@@ -47,7 +47,9 @@ pub async fn get_transcription_result(job_id: String) -> Result<String, String> 
                 let file_id_clone = file_id.clone();
                 let created_at = ic_cdk::api::time();
 
-                let (text, language) = match serde_json::from_str::<serde_json::Value>(&result_str) {
+                let (text, language, segments) = match
+                    serde_json::from_str::<serde_json::Value>(&result_str)
+                {
                     Ok(parsed) => {
                         let text = parsed
                             .get("text")
@@ -59,9 +61,13 @@ pub async fn get_transcription_result(job_id: String) -> Result<String, String> 
                             .and_then(|v| v.as_str().map(|s| s.to_string()))
                             .unwrap_or_else(|| "unknown".to_string());
 
-                        (text, language)
+                        let segments = parsed
+                            .get("segments")
+                            .and_then(|v| serde_json::from_value(v.clone()).ok())
+                            .unwrap_or_else(|| vec![]);
+                        (text, language, segments)
                     }
-                    Err(_) => (result_str.clone(), "unknown".to_string()),
+                    Err(_) => (result_str.clone(), "unknown".to_string(), vec![]),
                 };
 
                 map.borrow_mut().insert(file_id_clone, Transcription {
@@ -69,6 +75,7 @@ pub async fn get_transcription_result(job_id: String) -> Result<String, String> 
                     file_id: file_id.clone(),
                     text: text,
                     language: language,
+                    segments: segments,
                     created_at: created_at,
                     deleted_at: None,
                 });

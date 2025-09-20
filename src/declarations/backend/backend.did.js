@@ -7,8 +7,15 @@ export const idlFactory = ({ IDL }) => {
     'deleted_at' : IDL.Opt(IDL.Nat64),
     'file_id' : IDL.Text,
   });
+  const TranscriptionSegment = IDL.Record({
+    'id' : IDL.Nat32,
+    'end' : IDL.Float32,
+    'text' : IDL.Text,
+    'start' : IDL.Float32,
+  });
   const Transcription = IDL.Record({
     'text' : IDL.Text,
+    'segments' : IDL.Vec(TranscriptionSegment),
     'created_at' : IDL.Nat64,
     'language' : IDL.Text,
     'job_id' : IDL.Text,

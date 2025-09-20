@@ -1,7 +1,8 @@
 use candid::CandidType;
 use serde::{ Deserialize, Serialize };
 
-use crate::impl_storable;
+use crate::{ impl_storable };
+use super::TranscriptionSegment;
 
 #[derive(CandidType, Clone, Serialize, Deserialize, Debug)]
 pub struct Transcription {
@@ -9,6 +10,7 @@ pub struct Transcription {
     pub file_id: String,
     pub text: String,
     pub language: String,
+    pub segments: Vec<TranscriptionSegment>,
     pub created_at: u64,
     pub deleted_at: Option<u64>,
 }

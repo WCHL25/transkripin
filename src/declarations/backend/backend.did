@@ -53,11 +53,18 @@ type Summary = record {
 };
 type Transcription = record {
   "text" : text;
+  segments : vec TranscriptionSegment;
   created_at : nat64;
   language : text;
   job_id : text;
   deleted_at : opt nat64;
   file_id : text;
+};
+type TranscriptionSegment = record {
+  id : nat32;
+  end : float32;
+  "text" : text;
+  start : float32;
 };
 type UploadChunkRequest = record {
   chunk_index : nat64;
