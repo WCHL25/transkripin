@@ -12,6 +12,8 @@
   --color-primary: #1A84DB;
 
   --font-nunito: "Nunito", sans-serif;
+
+  --z-index-progress: 9999;
 }
 
 body {
@@ -24,4 +26,8 @@ body {
   /* number of lines to show */
   line-clamp: 3;
   -webkit-box-orient: vertical;
+}
+
+#nprogress .bar {
+  z-index: var(--z-index-progress) !important;
 }

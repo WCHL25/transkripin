@@ -1,7 +1,9 @@
+import EmptyState from "@/components/EmptyState";
 import SkeletonWorkCard from "@/components/SkeletonWorkCard";
 import WorkCard from "@/components/WorkCard";
 import { languageOptions, sortOptions, fileTypeOptions } from "@/data/options";
 import { useBackend } from "@/hooks/useBackend";
+import { useSnackbarStore } from "@/store/useSnackbarStore";
 import {
    getFileTypeFilter,
    getLanguageFilter,
@@ -25,7 +27,7 @@ import {
    FileArtifact,
    FileArtifactFilter,
 } from "declarations/backend/backend.did";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
    MdCheck,
    MdChevronRight,
@@ -42,6 +44,7 @@ const SavedWork = () => {
    const [anchorFilterEl, setAnchorFilterEl] = useState<null | HTMLElement>(
       null
    );
+   const [searchInput, setSearchInput] = useState("");
    const [filter, setFilter] = useState<FileArtifactFilter>({
       file_type: [],
       language: [],
@@ -58,6 +61,7 @@ const SavedWork = () => {
    const [loading, setLoading] = useState(true);
 
    const backend = useBackend();
+   const setSnackbar = useSnackbarStore((s) => s.setSnackbar);
 
    const openSort = Boolean(anchorSortEl);
    const openFilter = Boolean(anchorFilterEl);
@@ -71,19 +75,61 @@ const SavedWork = () => {
 
    const handleListUserFiles = async () => {
       setLoading(true);
+      try {
+         const listUserFiles = await backend.list_user_file_artifacts([filter]);
+         setWorks(listUserFiles);
+         console.log("listUserFiles", listUserFiles);
+      } catch (error: any) {
+         setSnackbar({ message: error.message });
+      }
 
-      const listUserFiles = await backend.list_user_file_artifacts([filter]);
-      setWorks(listUserFiles);
       setLoading(false);
-      console.log("listUserFiles", listUserFiles);
    };
 
    const handleListSavedFiles = async () => {
       setLoading(true);
-      const listSavedFiles = await backend.list_saved_file_artifacts([filter]);
-      setWorks(listSavedFiles);
+      try {
+         const listSavedFiles = await backend.list_saved_file_artifacts([
+            filter,
+         ]);
+         setWorks(listSavedFiles);
+         console.log("listSavedFiles", listSavedFiles);
+      } catch (error: any) {
+         setSnackbar({ message: error.message });
+      }
+
       setLoading(false);
-      console.log("listSavedFiles", listSavedFiles);
+   };
+
+   const hasFilters = useMemo(
+      () =>
+         Boolean(
+            filter.search.length ||
+               filter.language.length ||
+               filter.file_type.length ||
+               filter.language.length
+         ),
+      [filter]
+   );
+
+   const handleResetFilter = () => {
+      setSearchInput("");
+      setFilter({
+         file_type: [],
+         language: [],
+         search: [],
+         sort: filter.sort,
+      });
+   };
+
+   const getEmptyStateType = () => {
+      if (hasFilters) {
+         return "no-results";
+      }
+      if (selectedTab === "myWork") {
+         return "no-saved";
+      }
+      return "no-data";
    };
 
    useEffect(() => {
@@ -121,7 +167,7 @@ const SavedWork = () => {
                   value={"myWork"}
                />
                <Tab
-                  label="Saved Work"
+                  label="Bookmark"
                   className="px-6 py-3 text-foreground font-semibold z-10 rounded-full min-h-0"
                   value={"savedWork"}
                />
@@ -134,7 +180,11 @@ const SavedWork = () => {
                      type="text"
                      placeholder="Search"
                      className="bg-foreground text-background py-3 px-4 pl-9 rounded-lg focus:outline-2 outline-primary"
-                     onChange={(e) => debouncedSearch(e.target.value)}
+                     value={searchInput}
+                     onChange={(e) => {
+                        setSearchInput(e.target.value);
+                        debouncedSearch(e.target.value);
+                     }}
                   />
                </Box>
 
@@ -253,7 +303,8 @@ const SavedWork = () => {
                         <Box className="ml-5">
                            <MdCheck
                               className={`${
-                                 filter.sort.length && opt.value in filter.sort[0]!
+                                 filter.sort.length &&
+                                 opt.value in filter.sort[0]!
                                     ? "opacity-100"
                                     : "opacity-0"
                               }`}
@@ -266,11 +317,20 @@ const SavedWork = () => {
          </Box>
 
          <Box className="grid grid-cols-3 gap-4">
-            {loading
-               ? Array.from({ length: 6 }).map((_, idx) => (
-                    <SkeletonWorkCard key={idx} />
-                 ))
-               : works.map((w) => <WorkCard key={w.file_id} work={w} />)}
+            {loading ? (
+               Array.from({ length: 6 }).map((_, idx) => (
+                  <SkeletonWorkCard key={idx} />
+               ))
+            ) : !works.length ? (
+               <EmptyState
+                  type={getEmptyStateType()}
+                  searchTerm={filter.search[0]}
+                  hasFilters={hasFilters}
+                  onReset={handleResetFilter}
+               />
+            ) : (
+               works.map((w) => <WorkCard key={w.file_id} work={w} />)
+            )}
          </Box>
       </Box>
    );

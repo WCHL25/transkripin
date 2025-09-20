@@ -1,7 +1,9 @@
+import EmptyState from "@/components/EmptyState";
 import SkeletonWorkCard from "@/components/SkeletonWorkCard";
 import WorkCard from "@/components/WorkCard";
 import { languageOptions, fileTypeOptions } from "@/data/options";
 import { useBackend } from "@/hooks/useBackend";
+import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { getFileTypeFilter, getLanguageFilter } from "@/utils/getFilter";
 import {
    Box,
@@ -15,7 +17,7 @@ import {
    FileArtifact,
    FileArtifactFilter,
 } from "declarations/backend/backend.did";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MdCheck, MdChevronRight, MdSearch } from "react-icons/md";
 
 const Explore = () => {
@@ -27,6 +29,7 @@ const Explore = () => {
    const [works, setWorks] = useState<FileArtifact[]>([]);
    const [loading, setLoading] = useState(true);
 
+   const [searchInput, setSearchInput] = useState("");
    const [filter, setFilter] = useState<FileArtifactFilter>({
       file_type: [],
       language: [],
@@ -39,13 +42,46 @@ const Explore = () => {
    }, 500);
 
    const backend = useBackend();
+   const setSnackbar = useSnackbarStore((s) => s.setSnackbar);
+
+   const handleResetFilter = () => {
+      setSearchInput("");
+      setFilter({
+         file_type: [],
+         language: [],
+         search: [],
+         sort: filter.sort,
+      });
+   };
 
    const handleListFileArtifacts = async () => {
       setLoading(true);
-      const fileArtifacts = await backend.search_file_artifacts([filter]);
-      setWorks(fileArtifacts);
+      try {
+         const fileArtifacts = await backend.search_file_artifacts([filter]);
+         setWorks(fileArtifacts);
+         console.log("fileArtifacts", fileArtifacts);
+      } catch (error: any) {
+         setSnackbar({ message: error.message });
+      }
       setLoading(false);
-      console.log("fileArtifacts", fileArtifacts);
+   };
+
+   const hasFilters = useMemo(
+      () =>
+         Boolean(
+            filter.search.length ||
+               filter.language.length ||
+               filter.file_type.length ||
+               filter.language.length
+         ),
+      [filter]
+   );
+
+   const getEmptyStateType = () => {
+      if (hasFilters) {
+         return "no-results";
+      }
+      return "no-data";
    };
 
    useEffect(() => {
@@ -70,7 +106,11 @@ const Explore = () => {
                type="text"
                className="rounded-full bg-white focus:outline outline-primary text-xl w-full px-7 py-3 max-w-[800px] mx-auto block text-background"
                placeholder="Search..."
-               onChange={(e) => debouncedSearch(e.target.value)}
+               value={searchInput}
+               onChange={(e) => {
+                  setSearchInput(e.target.value);
+                  debouncedSearch(e.target.value);
+               }}
             />
 
             <Box className="flex justify-center gap-4">
@@ -118,7 +158,8 @@ const Explore = () => {
                         <Box className="ml-5">
                            <MdCheck
                               className={`${
-                                 filter.file_type.length && opt.value in filter.file_type[0]!
+                                 filter.file_type.length &&
+                                 opt.value in filter.file_type[0]!
                                     ? "opacity-100"
                                     : "opacity-0"
                               }`}
@@ -172,7 +213,8 @@ const Explore = () => {
                         <Box className="ml-5">
                            <MdCheck
                               className={`${
-                                 filter.language.length && opt.value in filter.language[0]!
+                                 filter.language.length &&
+                                 opt.value in filter.language[0]!
                                     ? "opacity-100"
                                     : "opacity-0"
                               }`}
@@ -184,13 +226,22 @@ const Explore = () => {
             </Box>
 
             <Box className="grid grid-cols-3 gap-4">
-               {loading
-                  ? Array.from({ length: 6 }).map((_, idx) => (
-                       <SkeletonWorkCard key={idx} isExplore />
-                    ))
-                  : works.map((w) => (
-                       <WorkCard key={w.file_id} work={w} isExplore />
-                    ))}
+               {loading ? (
+                  Array.from({ length: 6 }).map((_, idx) => (
+                     <SkeletonWorkCard key={idx} isExplore />
+                  ))
+               ) : !works.length ? (
+                  <EmptyState
+                     type={getEmptyStateType()}
+                     searchTerm={filter.search[0]}
+                     hasFilters={hasFilters}
+                     onReset={handleResetFilter}
+                  />
+               ) : (
+                  works.map((w) => (
+                     <WorkCard key={w.file_id} work={w} isExplore />
+                  ))
+               )}
             </Box>
          </Box>
       </Box>

@@ -1,7 +1,10 @@
+import { useBackend } from "@/hooks/useBackend";
+import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { formatRelativeTime } from "@/utils/dateUtils";
-import { Box, Button, IconButton } from "@mui/material";
+import { useAuth } from "@ic-reactor/react";
+import { Box, Button, IconButton, Tooltip } from "@mui/material";
 import { FileArtifact } from "declarations/backend/backend.did";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
    MdAudiotrack,
    MdBookmarkBorder,
@@ -21,6 +24,24 @@ const WorkCard = ({ work, isExplore = false }: Props) => {
    const date = useMemo(() => {
       return formatRelativeTime(work.created_at);
    }, [work.created_at]);
+
+   const { identity } = useAuth();
+   const backend = useBackend();
+   const setSnackbar = useSnackbarStore((s) => s.setSnackbar);
+
+   const [loading, setLoading] = useState(false);
+
+   const handleToggleBookmark = async () => {
+      setLoading(true);
+      const result = await backend.toggle_file_artifact_bookmark(work.file_id);
+      setLoading(false);
+
+      if ("Err" in result) {
+         setSnackbar({
+            message: result.Err,
+         });
+      }
+   };
 
    return (
       <Box className="p-5 rounded-[10px] bg-background border border-background3 flex flex-col gap-5">
@@ -51,11 +72,18 @@ const WorkCard = ({ work, isExplore = false }: Props) => {
             {work.summary[0]?.text}
          </p>
          <Box className="flex justify-end gap-4 items-center">
-            {isExplore && (
-               <IconButton>
-                  <MdBookmarkBorder className="text-foreground" />
-               </IconButton>
-            )}
+            {isExplore &&
+               (work.owner.toText() == identity?.getPrincipal().toText() ? (
+                  <Tooltip title="Can't bookmark your own work">
+                     <IconButton className="cursor-not-allowed">
+                        <MdBookmarkBorder className="text-foreground" />
+                     </IconButton>
+                  </Tooltip>
+               ) : (
+                  <IconButton onClick={handleToggleBookmark} disabled={loading}>
+                     <MdBookmarkBorder className="text-foreground" />
+                  </IconButton>
+               ))}
             <IconButton>
                <MdShare className="text-foreground" />
             </IconButton>

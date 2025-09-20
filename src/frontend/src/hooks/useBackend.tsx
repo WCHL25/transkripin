@@ -1,3 +1,4 @@
+// import { useBackendStore } from "@/store/useBackendStore";
 import { Identity } from "@dfinity/agent";
 import { useAuth } from "@ic-reactor/react";
 import { createActor, canisterId, backend } from "declarations/backend";
@@ -17,6 +18,7 @@ export const createAuthenticatedBackend = (identity: Identity) => {
 
 export const useBackend = () => {
   const { identity, isAuthenticated } = useAuth();
+  // const { backend, setBackend, createAuthenticatedActor, resetBackend } = useBackendStore();
 
   return useMemo(() => {
     if (!isAuthenticated || !identity) {
@@ -25,6 +27,6 @@ export const useBackend = () => {
 
     const  authenticatedBackend = createAuthenticatedBackend(identity);
 
-    return authenticatedBackend || backend;
+    return authenticatedBackend;
   }, [identity, isAuthenticated]);
 };
