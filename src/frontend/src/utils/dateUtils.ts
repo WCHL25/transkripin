@@ -62,3 +62,9 @@ export const formatRelativeTime = (nanoseconds: number | bigint): string => {
    const years = Math.floor(days / 365);
    return `${years} year${years > 1 ? "s" : ""} ago`;
 };
+
+export const formatTime = (seconds: number): string => {
+   const minutes = Math.floor(seconds / 60);
+   const remainingSeconds = Math.floor(seconds % 60);
+   return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+};

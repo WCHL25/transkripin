@@ -7,7 +7,7 @@ import {
    Tabs,
    Tooltip,
 } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import exampleVideo from "@/assets/video/example.mp4";
 import {
@@ -22,7 +22,7 @@ import ModalDelete from "./components/ModalDelete";
 import ModalShare from "./components/ModalShare";
 import { useBackend } from "@/hooks/useBackend";
 import { FileArtifact } from "declarations/backend/backend.did";
-import { formatRelativeTime } from "@/utils/dateUtils";
+import { formatRelativeTime, formatTime } from "@/utils/dateUtils";
 
 // interface Transcript {
 //    second: string;
@@ -87,8 +87,19 @@ const Result = () => {
       } catch (error: any) {
          console.error(error.message);
          setSnackbar({
-            message: "Tautan gagal disalin. Silahkan salin manual",
+            message: "Link failed to copy. Please copy manually.",
          });
+      }
+   };
+
+   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
+
+   // Function untuk seek ke waktu tertentu
+   const handleSeekTo = (timeInSeconds: number) => {
+      if (mediaRef.current) {
+         mediaRef.current.currentTime = timeInSeconds;
+         // Auto play setelah seek (optional)
+         mediaRef.current.play().catch(console.error);
       }
    };
 
@@ -109,7 +120,7 @@ const Result = () => {
          work.visibility = { Public: null };
       }
 
-      setWork({...work});
+      setWork({ ...work });
    };
 
    useEffect(() => {
@@ -176,16 +187,20 @@ const Result = () => {
             </Box>
          </Box>
 
-         <Box className="relative flex gap-5 items-stretch">
-            <Box className="grow basis-0 rounded-lg overflow-hidden">
+         <Box className="flex gap-5 items-stretch">
+            <Box className="grow basis-0 rounded-lg overflow-hidden sticky top-20">
                {work?.content_type.startsWith("video") ? (
                   <video
-                     src={_videoUrl}
+                     ref={mediaRef as React.RefObject<HTMLVideoElement>}
+                     src={exampleVideo}
                      controls
                      className="w-full rounded-xl"
                   ></video>
                ) : work?.content_type.startsWith("audio") ? (
-                  <audio controls>
+                  <audio
+                     controls
+                     ref={mediaRef as React.RefObject<HTMLAudioElement>}
+                  >
                      <source src={_videoUrl} type="audio/mp3" />
                      Your browser does not support the audio element.
                   </audio>
@@ -230,20 +245,63 @@ const Result = () => {
                      </Tooltip>
                   </Box>
                   {selectedTab == "summary" ? (
-                     <Box className="p-5">{work?.summary[0]?.text}</Box>
+                     <Box className="p-5">
+                        {loading ? (
+                           <>
+                              <Skeleton
+                                 variant="text"
+                                 className="text-sm/normal w-full"
+                              ></Skeleton>
+                              <Skeleton
+                                 variant="text"
+                                 className="text-sm/normal w-full"
+                              ></Skeleton>
+                              <Skeleton
+                                 variant="text"
+                                 className="text-sm/normal w-full"
+                              ></Skeleton>
+                              <Skeleton
+                                 variant="text"
+                                 className="text-sm/normal w-full"
+                              ></Skeleton>
+                              <Skeleton
+                                 variant="text"
+                                 className="text-sm/normal w-4/5"
+                              ></Skeleton>
+                           </>
+                        ) : (
+                           work?.summary[0]?.text
+                        )}
+                     </Box>
                   ) : (
                      <Box className="p-5 flex flex-col gap-6">
-                        {/* {work?.transcription[0]?.text.map((t: Transcript) => (
-                           <Box
-                              key={t.second}
-                              className="flex gap-4 items-start"
-                           >
-                              <p className="text-primary hover:underline cursor-pointer">
-                                 {t.second}
-                              </p>
-                              <p>{t.text}</p>
+                        {loading ? Array.from({length: 6}).map((_, idx) => (
+                           <Box key={idx} className="flex gap-4 items-start">
+                              <Skeleton variant="text" className="text-sm/normal w-16" />
+                              <Box className="grow basis-0">
+                                 <Skeleton variant="text" className="text-sm/normal w-full" />
+                                 <Skeleton variant="text" className="text-sm/normal w-4/5" />
+                              </Box>
                            </Box>
-                        ))} */}
+                        )) : work?.transcription[0]?.segments.map((s) => {
+                           const startTime = formatTime(s.start);
+                           return (
+                              <Box
+                                 key={s.id}
+                                 className="flex gap-4 items-start"
+                              >
+                                 <Tooltip title={`Jump to ${startTime}`}>
+                                    <p
+                                       className="text-primary hover:underline cursor-pointer"
+                                       onClick={() => handleSeekTo(s.start)}
+                                    >
+                                       {startTime}
+                                    </p>
+                                 </Tooltip>
+                                 <p>{s.text}</p>
+                              </Box>
+                           );
+                        })}
                      </Box>
                   )}
                </Box>
