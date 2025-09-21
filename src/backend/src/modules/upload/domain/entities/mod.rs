@@ -1,10 +1,10 @@
-pub mod bookmark;
 pub mod download_chunk_request;
 pub mod download_chunk_response;
 pub mod file_artifact_filter;
 pub mod file_artifact_request;
 pub mod file_artifact_visibility;
-pub mod file_artifact_with_meta;
+pub mod user_file_artifact;
+pub mod user_bookmark;
 pub mod file_artifact;
 pub mod file_type_filter;
 pub mod job_status;
@@ -19,13 +19,13 @@ pub mod upload_chunk_request;
 pub mod upload_file;
 pub mod upload_session;
 
-pub use bookmark::*;
 pub use download_chunk_request::*;
 pub use download_chunk_response::*;
 pub use file_artifact_filter::*;
 pub use file_artifact_request::*;
 pub use file_artifact_visibility::*;
-pub use file_artifact_with_meta::*;
+pub use user_file_artifact::*;
+pub use user_bookmark::*;
 pub use file_artifact::*;
 pub use file_type_filter::*;
 pub use job_status::*;

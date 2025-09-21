@@ -6,20 +6,20 @@ use crate::{
     modules::{
         upload::{
             domain::entities::{
-                Bookmark,
                 FileArtifact,
                 FileArtifactFilter,
                 FileArtifactRequest,
                 FileArtifactVisibility,
-                FileArtifactWithMeta,
+                UserFileArtifact,
+                UserBookmarks,
                 JobStatus,
                 LlmResponse,
                 Summary,
             },
-            service::{ call_ollama, save_file_artifact, fetch_file_artifacts_with_bookmark },
+            service::{ call_ollama, save_file_artifact, fetch_file_artifacts },
         },
     },
-    BOOKMARKS,
+    USER_BOOKMARKS,
     FILE_ARTIFACTS,
     JOBS,
     SUMMARIES,
@@ -145,23 +145,21 @@ pub fn get_summary_result(file_id: String) -> JobStatus {
 
 /// Query a file artifact with bookmark info for the caller
 #[query]
-pub fn get_file_artifact(file_id: String) -> Option<FileArtifactWithMeta> {
+pub fn get_file_artifact(file_id: String) -> Option<UserFileArtifact> {
     let caller = ic_cdk::api::caller();
 
     FILE_ARTIFACTS.with(|map| {
         map.borrow()
             .get(&file_id)
             .map(|artifact| {
-                let is_bookmarked = BOOKMARKS.with(|bookmarks| {
-                    let store = bookmarks.borrow();
-                    let key = &(Bookmark {
-                        user: caller,
-                        file_id: artifact.file_id.clone(),
-                    });
-                    store.contains_key(key)
+                let is_bookmarked = USER_BOOKMARKS.with(|ub| {
+                    ub.borrow()
+                        .get(&caller)
+                        .map(|entry| entry.file_ids.contains(&file_id))
+                        .unwrap_or(false)
                 });
 
-                FileArtifactWithMeta { artifact, is_bookmarked }
+                UserFileArtifact { artifact, is_bookmarked }
             })
     })
 }
@@ -228,33 +226,35 @@ pub fn delete_file_artifact(file_id: String) -> Result<(), String> {
 
 /// List all file artifact for the current caller
 #[query]
-pub fn list_user_file_artifacts(filter: Option<FileArtifactFilter>) -> Vec<FileArtifactWithMeta> {
+pub fn list_user_file_artifacts(filter: Option<FileArtifactFilter>) -> Vec<UserFileArtifact> {
     let caller = ic_cdk::api::caller();
 
-    fetch_file_artifacts_with_bookmark(|artifact| artifact.owner == caller, filter)
+    fetch_file_artifacts(|artifact| artifact.owner == caller, filter)
 }
 
 /// List all bookmarked file artifacts for the current caller
 #[query]
-pub fn list_saved_file_artifacts(filter: Option<FileArtifactFilter>) -> Vec<FileArtifactWithMeta> {
+pub fn list_saved_file_artifacts(filter: Option<FileArtifactFilter>) -> Vec<UserFileArtifact> {
     let caller = ic_cdk::api::caller();
 
-    fetch_file_artifacts_with_bookmark(|artifact| {
-        let key = &(Bookmark {
-            user: caller,
-            file_id: artifact.file_id.clone(),
-        });
+    // Get caller’s bookmarked file_ids once
+    let file_ids = USER_BOOKMARKS.with(|ub| {
+        ub.borrow()
+            .get(&caller)
+            .map(|entry| entry.file_ids.clone())
+            .unwrap_or_default()
+    });
 
-        BOOKMARKS.with(|b| b.borrow().contains_key(key))
-    }, filter)
+    // Use fetch_file_artifacts with a filter_fn that only allows bookmarked files
+    fetch_file_artifacts(|artifact| file_ids.contains(&artifact.file_id), filter)
 }
 
 /// Search all file artifacts
 #[query]
-pub fn search_file_artifacts(filter: Option<FileArtifactFilter>) -> Vec<FileArtifactWithMeta> {
+pub fn search_file_artifacts(filter: Option<FileArtifactFilter>) -> Vec<UserFileArtifact> {
     let caller = ic_cdk::api::caller();
 
-    fetch_file_artifacts_with_bookmark(
+    fetch_file_artifacts(
         |artifact| (artifact.visibility.is_public() || artifact.owner == caller),
         filter
     )
@@ -297,16 +297,25 @@ pub fn toggle_file_artifact_bookmark(file_id: String) -> Result<String, String> 
                     return Err("You cannot bookmark this private artifact".to_string());
                 }
 
-                BOOKMARKS.with(|bookmarks| {
-                    let mut store = bookmarks.borrow_mut();
-                    let key = Bookmark { user: caller, file_id: file_id.clone() };
+                USER_BOOKMARKS.with(|ub| {
+                    let mut bookmarks = ub.borrow_mut();
 
-                    if store.contains_key(&key) {
-                        store.remove(&key);
-                        Ok("Removed file artifact to the saved list".to_string())
+                    // Get or create caller’s bookmark entry
+                    let mut entry = bookmarks.get(&caller).unwrap_or(UserBookmarks {
+                        user: caller,
+                        file_ids: vec![],
+                    });
+
+                    if entry.file_ids.contains(&file_id) {
+                        // Remove if already bookmarked
+                        entry.file_ids.retain(|id| id != &file_id);
+                        bookmarks.insert(caller, entry);
+                        Ok("Removed file artifact from saved list".to_string())
                     } else {
-                        store.insert(key, ());
-                        Ok("Added file artifact to the saved list".to_string())
+                        // Add if not already bookmarked
+                        entry.file_ids.push(file_id.clone());
+                        bookmarks.insert(caller, entry);
+                        Ok("Added file artifact to saved list".to_string())
                     }
                 })
             }

@@ -68,10 +68,10 @@ thread_local! {
         StableBTreeMap::init(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_FILE_ARTIFACTS)))
     );
 
-    static BOOKMARKS: RefCell<
-        StableBTreeMap<Bookmark, (), VirtualMemory<DefaultMemoryImpl>>
+    static USER_BOOKMARKS: RefCell<
+        StableBTreeMap<Principal, UserBookmarks, VirtualMemory<DefaultMemoryImpl>>
     > = RefCell::new(
-        StableBTreeMap::init(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_BOOKMARKS)))
+        StableBTreeMap::init(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_USER_BOOKMARKS)))
     );
 
     static JOBS: RefCell<

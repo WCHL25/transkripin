@@ -2,13 +2,18 @@ use ic_cdk::{ query, update };
 
 use crate::{
     common::*,
-    modules::upload::domain::entities::{
-        UploadSession,
-        UploadedFile,
-        UploadChunkRequest,
-        StartUploadRequest,
-        DownloadChunkRequest,
-        DownloadChunkResponse,
+    modules::{
+        upload::{
+            service::check_artifact_visibility,
+            domain::entities::{
+                DownloadChunkRequest,
+                DownloadChunkResponse,
+                StartUploadRequest,
+                UploadChunkRequest,
+                UploadSession,
+                UploadedFile,
+            },
+        },
     },
     UPLOADED_FILES,
     UPLOAD_SESSIONS,
@@ -142,12 +147,15 @@ pub async fn complete_upload(session_id: String) -> Result<String, String> {
 #[query]
 pub fn get_upload_status(session_id: String) -> Result<(u64, u64), String> {
     let caller = ic_cdk::api::caller();
+
     UPLOAD_SESSIONS.with(|sessions| {
         let sessions = sessions.borrow();
         match sessions.get(&session_id) {
             Some(session) => {
                 if session.owner != caller {
-                    return Err("Unauthorized".to_string());
+                    return Err(
+                        "Unauthorized: You don't have permission for this action".to_string()
+                    );
                 }
                 let uploaded_chunks = session.uploaded_chunks
                     .iter()
@@ -162,6 +170,11 @@ pub fn get_upload_status(session_id: String) -> Result<(u64, u64), String> {
 
 #[query]
 pub fn get_file(file_id: String) -> Result<UploadedFile, String> {
+    let caller = ic_cdk::api::caller();
+
+    // Visibility check
+    check_artifact_visibility(&file_id, caller)?;
+
     UPLOADED_FILES.with(|files| {
         let files = files.borrow();
         match files.get(&file_id) {
@@ -173,6 +186,11 @@ pub fn get_file(file_id: String) -> Result<UploadedFile, String> {
 
 #[query]
 pub fn get_file_chunk(request: DownloadChunkRequest) -> Result<DownloadChunkResponse, String> {
+    let caller = ic_cdk::api::caller();
+
+    // Visibility check
+    check_artifact_visibility(&request.file_id, caller)?;
+
     UPLOADED_FILES.with(|files| {
         let files = files.borrow();
         let file = files.get(&request.file_id).ok_or_else(|| "File not found".to_string())?;
@@ -190,27 +208,15 @@ pub fn get_file_chunk(request: DownloadChunkRequest) -> Result<DownloadChunkResp
     })
 }
 
-#[query]
-pub fn list_files() -> Vec<(String, String, String, u64)> {
-    let caller = ic_cdk::api::caller();
-    UPLOADED_FILES.with(|files| {
-        files
-            .borrow()
-            .values()
-            .filter(|f| f.owner == caller)
-            .map(|f| (f.id.clone(), f.filename.clone(), f.content_type.clone(), f.size))
-            .collect()
-    })
-}
-
 #[update]
 pub fn delete_file(file_id: String) -> Result<String, String> {
     let caller = ic_cdk::api::caller();
+
     UPLOADED_FILES.with(|files| {
         let mut files = files.borrow_mut();
         match files.get(&file_id) {
             Some(f) => if f.owner != caller {
-                Err("Unauthorized".to_string())
+                Err("Unauthorized: You don't have permission for this action".to_string())
             } else {
                 files.remove(&file_id);
                 Ok("File deleted".to_string())

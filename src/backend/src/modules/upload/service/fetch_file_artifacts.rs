@@ -1,23 +1,16 @@
 use crate::{
-    modules::{
-        upload::domain::entities::{
-            Bookmark,
-            FileArtifact,
-            FileArtifactFilter,
-            FileArtifactWithMeta,
-        },
-    },
-    BOOKMARKS,
+    modules::upload::domain::entities::{ FileArtifact, FileArtifactFilter, UserFileArtifact },
+    USER_BOOKMARKS,
     FILE_ARTIFACTS,
 };
 
 use super::filter_file_artifacts;
 
 /// Generic helper to fetch artifacts and include bookmark info
-pub fn fetch_file_artifacts_with_bookmark<F>(
+pub fn fetch_file_artifacts<F>(
     filter_fn: F,
     artifact_filter: Option<FileArtifactFilter>
-) -> Vec<FileArtifactWithMeta>
+) -> Vec<UserFileArtifact>
     where F: Fn(&FileArtifact) -> bool
 {
     let caller = ic_cdk::api::caller();
@@ -33,20 +26,20 @@ pub fn fetch_file_artifacts_with_bookmark<F>(
     // Apply optional artifact filter
     let filtered: Vec<FileArtifact> = filter_file_artifacts(artifacts, artifact_filter);
 
-    // Map each filtered artifact to include bookmark info
-    BOOKMARKS.with(|bookmarks| {
-        let store = bookmarks.borrow();
-        filtered
-            .into_iter()
-            .map(|artifact| {
-                let is_bookmarked = store.contains_key(
-                    &(Bookmark {
-                        user: caller,
-                        file_id: artifact.file_id.clone(),
-                    })
-                );
-                FileArtifactWithMeta { artifact, is_bookmarked }
-            })
-            .collect()
-    })
+    // Get caller’s bookmarks once
+    let user_bookmarks: Vec<String> = USER_BOOKMARKS.with(|ub| {
+        ub.borrow()
+            .get(&caller)
+            .map(|entry| entry.file_ids.clone())
+            .unwrap_or_default()
+    });
+
+    // Map each artifact to include bookmark info
+    filtered
+        .into_iter()
+        .map(|artifact| {
+            let is_bookmarked = user_bookmarks.contains(&artifact.file_id);
+            UserFileArtifact { artifact, is_bookmarked }
+        })
+        .collect()
 }

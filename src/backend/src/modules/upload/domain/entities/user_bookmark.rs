@@ -4,9 +4,9 @@ use serde::{ Deserialize, Serialize };
 use crate::impl_storable;
 
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Bookmark {
+pub struct UserBookmarks {
     pub user: Principal,
-    pub file_id: String,
+    pub file_ids: Vec<String>,
 }
 
-impl_storable!(Bookmark);
+impl_storable!(UserBookmarks);

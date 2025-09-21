@@ -8,4 +8,4 @@ pub const MEMORY_ID_TRANSCRIPTIONS: MemoryId = MemoryId::new(4);
 pub const MEMORY_ID_JOBS: MemoryId = MemoryId::new(5);
 pub const MEMORY_ID_SUMMARIES: MemoryId = MemoryId::new(6);
 pub const MEMORY_ID_FILE_ARTIFACTS: MemoryId = MemoryId::new(7);
-pub const MEMORY_ID_BOOKMARKS: MemoryId = MemoryId::new(8);
+pub const MEMORY_ID_USER_BOOKMARKS: MemoryId = MemoryId::new(8);
