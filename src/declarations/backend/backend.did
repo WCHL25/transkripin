@@ -30,10 +30,6 @@ type FileArtifactRequest = record {
   file_id : text;
 };
 type FileArtifactVisibility = variant { Private; Public };
-type UserFileArtifact = record {
-  artifact : FileArtifact;
-  is_bookmarked : bool;
-};
 type FileTypeFilter = variant { Audio; Video };
 type JobStatus = variant { Failed : text; Completed : text; Pending };
 type LanguageFilter = variant { English; Indonesia };
@@ -91,6 +87,10 @@ type UploadedFile = record {
   created_at : nat64;
   filename : text;
   deleted_at : opt nat64;
+};
+type UserFileArtifact = record {
+  artifact : FileArtifact;
+  is_bookmarked : bool;
 };
 service : () -> {
   complete_upload : (text) -> (Result);

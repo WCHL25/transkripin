@@ -10,21 +10,21 @@ use crate::{
                 FileArtifactFilter,
                 FileArtifactRequest,
                 FileArtifactVisibility,
-                UserFileArtifact,
-                UserBookmarks,
                 JobStatus,
                 LlmResponse,
                 Summary,
+                UserBookmarks,
+                UserFileArtifact,
             },
-            service::{ call_ollama, save_file_artifact, fetch_file_artifacts },
+            service::{ call_ollama, fetch_file_artifacts, save_file_artifact },
         },
     },
-    USER_BOOKMARKS,
     FILE_ARTIFACTS,
     JOBS,
     SUMMARIES,
     TRANSCRIPTIONS,
     UPLOADED_FILES,
+    USER_BOOKMARKS,
 };
 
 /* Summarization */
@@ -167,10 +167,16 @@ pub fn get_file_artifact(file_id: String) -> Option<UserFileArtifact> {
 /// Update a file artifact
 #[update]
 pub fn edit_file_artifact(request: FileArtifactRequest) -> Result<FileArtifact, String> {
+    let caller = ic_cdk::api::caller();
+
     FILE_ARTIFACTS.with(|map| {
         let mut store = map.borrow_mut();
 
         if let Some(mut artifact) = store.get(&request.file_id) {
+            if artifact.owner != caller {
+                return Err("Unauthorized: You are not the owner".to_string());
+            }
+
             // Update only the provided fields
             if request.title.is_some() {
                 artifact.title = request.title;
@@ -196,10 +202,21 @@ pub fn edit_file_artifact(request: FileArtifactRequest) -> Result<FileArtifact, 
 /// Delete a file artifact
 #[update]
 pub fn delete_file_artifact(file_id: String) -> Result<(), String> {
-    let artifact_deleted = FILE_ARTIFACTS.with(|map| map.borrow_mut().remove(&file_id));
-    if artifact_deleted.is_none() {
-        return Err(format!("File artifact with id {} not found", file_id));
+    let caller = ic_cdk::api::caller();
+
+    // Fetch and check ownership
+    let artifact = FILE_ARTIFACTS.with(|map| map.borrow().get(&file_id)).ok_or_else(||
+        format!("Artifact {file_id} not found")
+    )?;
+
+    if artifact.owner != caller {
+        return Err("Unauthorized: you are not the owner".to_string());
     }
+
+    // Remove the File Artifact
+    FILE_ARTIFACTS.with(|map| {
+        map.borrow_mut().remove(&file_id);
+    });
 
     // Remove related Transcription
     TRANSCRIPTIONS.with(|map| {
@@ -263,10 +280,16 @@ pub fn search_file_artifacts(filter: Option<FileArtifactFilter>) -> Vec<UserFile
 /// Toggle visibility of a file artifact
 #[update]
 pub fn toggle_file_artifact_visibility(file_id: String) -> Result<String, String> {
+    let caller = ic_cdk::api::caller();
+
     FILE_ARTIFACTS.with(|map| {
         let mut store = map.borrow_mut();
 
         if let Some(mut artifact) = store.get(&file_id) {
+            if artifact.owner != caller {
+                return Err("Unauthorized: You are not the owner".to_string());
+            }
+
             artifact.visibility = match artifact.visibility {
                 FileArtifactVisibility::Private => FileArtifactVisibility::Public,
                 FileArtifactVisibility::Public => FileArtifactVisibility::Private,
