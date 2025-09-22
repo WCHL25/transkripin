@@ -2,7 +2,13 @@ import { useBackend } from "@/hooks/useBackend";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { formatRelativeTime } from "@/utils/dateUtils";
 import { useAuth } from "@ic-reactor/react";
-import { Box, Button, CircularProgress, IconButton, Tooltip } from "@mui/material";
+import {
+   Box,
+   Button,
+   CircularProgress,
+   IconButton,
+   Tooltip,
+} from "@mui/material";
 import { UserFileArtifact } from "declarations/backend/backend.did";
 import { useMemo, useState } from "react";
 import {
@@ -20,9 +26,15 @@ interface Props {
    work: UserFileArtifact;
    isExplore?: boolean;
    onToggleBookmark?: (fileId: string) => void;
+   onShare: (fileId: string) => void;
 }
 
-const WorkCard = ({ work, isExplore = false, onToggleBookmark }: Props) => {
+const WorkCard = ({
+   work,
+   isExplore = false,
+   onToggleBookmark,
+   onShare,
+}: Props) => {
    const date = useMemo(() => {
       return formatRelativeTime(work.artifact.created_at);
    }, [work.artifact.created_at]);
@@ -90,14 +102,16 @@ const WorkCard = ({ work, isExplore = false, onToggleBookmark }: Props) => {
                   </Tooltip>
                ) : (
                   <IconButton onClick={handleToggleBookmark} disabled={loading}>
-                     {loading ? <CircularProgress size={18} /> : work.is_bookmarked ? (
+                     {loading ? (
+                        <CircularProgress size={18} />
+                     ) : work.is_bookmarked ? (
                         <MdBookmark className="text-foreground" />
                      ) : (
                         <MdBookmarkBorder className="text-foreground" />
                      )}
                   </IconButton>
                ))}
-            <IconButton>
+            <IconButton onClick={() => onShare(work.artifact.file_id)}>
                <MdShare className="text-foreground" />
             </IconButton>
             <Link to={`/works/${work.artifact.file_id}`}>

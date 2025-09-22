@@ -35,6 +35,7 @@ import {
    MdSearch,
    MdSort,
 } from "react-icons/md";
+import ModalShare from "../Result/components/ModalShare";
 
 const SavedWork = () => {
    const [selectedTab, setSelectedTab] = useState<"myWork" | "savedWork">(
@@ -53,6 +54,8 @@ const SavedWork = () => {
    });
 
    const [works, setWorks] = useState<UserFileArtifact[]>([]);
+   const [openShare, setOpenShare] = useState<boolean>(false);
+   const [selectedWork, setSelectedWork] = useState<number | null>(null);
 
    const debouncedSearch = debounce((q: string) => {
       setFilter((p) => ({ ...p, search: [q] }));
@@ -122,6 +125,26 @@ const SavedWork = () => {
       });
    };
 
+   const handleToggleVisibility = () => {
+      if (!selectedWork) return;
+
+      const work = works[selectedWork];
+      if (!work) return;
+
+      if ("Public" in work.artifact.visibility) {
+         work.artifact.visibility = { Private: null };
+      } else {
+         work.artifact.visibility = { Public: null };
+      }
+
+      setWorks([...works]);
+   };
+
+   const handleShare = (idx: number) => {
+      setOpenShare(true);
+      setSelectedWork(idx);
+   };
+
    const getEmptyStateType = () => {
       if (hasFilters) {
          return "no-results";
@@ -148,6 +171,12 @@ const SavedWork = () => {
          component="main"
          className="px-5 pt-36 pb-20 container mx-auto relative overflow-hidden"
       >
+         <ModalShare
+            open={openShare}
+            onClose={() => setOpenShare(false)}
+            data={selectedWork !== null ? works[selectedWork]?.artifact : null}
+            toggleVisibility={handleToggleVisibility}
+         />
          <Box className="flex items-center justify-between gap-5 mb-6">
             <Tabs
                value={selectedTab}
@@ -329,7 +358,13 @@ const SavedWork = () => {
                   onReset={handleResetFilter}
                />
             ) : (
-               works.map((w) => <WorkCard key={w.artifact.file_id} work={w} />)
+               works.map((w, idx) => (
+                  <WorkCard
+                     key={w.artifact.file_id}
+                     work={w}
+                     onShare={() => handleShare(idx)}
+                  />
+               ))
             )}
          </Box>
       </Box>

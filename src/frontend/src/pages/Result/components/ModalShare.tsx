@@ -13,6 +13,7 @@ import {
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { FileArtifact } from "declarations/backend/backend.did";
 import { useBackend } from "@/hooks/useBackend";
+import { useAuth } from "@ic-reactor/react";
 
 interface Props {
    open: boolean;
@@ -31,6 +32,7 @@ const ModalShare = ({ open, onClose, data, toggleVisibility }: Props) => {
       setIsCopied(false);
    }, 2000);
 
+   const { identity } = useAuth();
    const backend = useBackend();
 
    const handleChangeVisibility = async () => {
@@ -82,36 +84,38 @@ const ModalShare = ({ open, onClose, data, toggleVisibility }: Props) => {
                </p>
             </Box>
 
-            <Box className="flex justify-between gap-2 items-center mb-5">
-               <Box className="flex gap-2 items-center">
-                  <Box className="w-8 h-8 grid place-items-center text-xl text-foreground bg-background3 rounded-lg">
-                     {data && "Public" in data.visibility ? (
-                        <MdPublic />
-                     ) : (
-                        <MdLock />
-                     )}
+            {data?.owner.toText() == identity?.getPrincipal().toText() && (
+               <Box className="flex justify-between gap-2 items-center mb-5">
+                  <Box className="flex gap-2 items-center">
+                     <Box className="w-8 h-8 grid place-items-center text-xl text-foreground bg-background3 rounded-lg">
+                        {data && "Public" in data.visibility ? (
+                           <MdPublic />
+                        ) : (
+                           <MdLock />
+                        )}
+                     </Box>
+
+                     <Box>
+                        <p className="font-semibold">
+                           {data && "Public" in data.visibility
+                              ? "Public"
+                              : "Private"}
+                        </p>
+                        <p className="text-foreground2 text-xs">
+                           {data && "Public" in data.visibility
+                              ? "Anyone can view"
+                              : "Only you can view"}
+                        </p>
+                     </Box>
                   </Box>
 
-                  <Box>
-                     <p className="font-semibold">
-                        {data && "Public" in data.visibility
-                           ? "Public"
-                           : "Private"}
-                     </p>
-                     <p className="text-foreground2 text-xs">
-                        {data && "Public" in data.visibility
-                           ? "Anyone can view"
-                           : "Only you can view"}
-                     </p>
-                  </Box>
+                  <Switch
+                     checked={Boolean(data && "Public" in data.visibility)}
+                     onChange={handleChangeVisibility}
+                     disabled={loading}
+                  />
                </Box>
-
-               <Switch
-                  checked={Boolean(data && "Public" in data.visibility)}
-                  onChange={handleChangeVisibility}
-                  disabled={loading}
-               />
-            </Box>
+            )}
 
             <Box className="flex gap-2 items-center">
                <Box className="relative grow basis-0">
