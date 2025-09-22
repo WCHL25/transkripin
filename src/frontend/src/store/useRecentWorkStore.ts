@@ -9,7 +9,7 @@ interface RecentWorkState {
 }
 
 export const useRecentWorkStore = create<RecentWorkState>((set, get) => ({
-   loading: false,
+   loading: true,
    recentWorks: [],
    reload: async (backend) => {
       const listUserFiles = await backend.list_user_file_artifacts([

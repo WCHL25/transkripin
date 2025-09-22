@@ -3,7 +3,8 @@ import logo from "@/assets/img/logo_blue.svg";
 import { useEffect, useState } from "react";
 import { useAuth, useUpdateCall } from "@ic-reactor/react";
 import { useBackend } from "@/hooks/useBackend";
-import { SIDEBAR_WIDTH } from "./Sidebar";
+import { FULL_SIDEBAR_WIDTH, SIDEBAR_WIDTH } from "./Sidebar";
+import { useRecentWorkStore } from "@/store/useRecentWorkStore";
 
 const MAX_SCROLL = 200;
 
@@ -45,11 +46,13 @@ const Header = ({ hideLogo = false }: Props) => {
    });
 
    const backend = useBackend();
+   const reload = useRecentWorkStore(s => s.reload)
 
    const { logout, login, isAuthenticating, isAuthenticated } = useAuth({
       onLoginSuccess: async (principal) => {
          console.log("Login successful, identity:", principal.toText() || "");
 
+         reload(backend)
          loginCall();
       },
    });
@@ -66,6 +69,7 @@ const Header = ({ hideLogo = false }: Props) => {
          const res = await backend.logout();
          console.log("Logout response:", res);
          await logout();
+         reload(backend)
          handleClose();
       }
    };
@@ -73,11 +77,11 @@ const Header = ({ hideLogo = false }: Props) => {
    return (
       <Box
          component="header"
-         className="fixed top-0 py-5 z-10"
+         className="fixed top-0 py-5 z-10 transition-all"
          sx={{
             backgroundColor: `rgba(30,35,55,${opacity})`,
-            left: SIDEBAR_WIDTH,
-            width: `calc(100% - ${SIDEBAR_WIDTH}px)`,
+            left: hideLogo ? FULL_SIDEBAR_WIDTH : SIDEBAR_WIDTH,
+            width: `calc(100% - ${hideLogo ? FULL_SIDEBAR_WIDTH : SIDEBAR_WIDTH}px)`,
          }}
       >
          <Box className="flex justify-between px-5 container mx-auto w-full">

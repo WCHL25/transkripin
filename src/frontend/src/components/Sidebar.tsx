@@ -154,6 +154,10 @@ const Sidebar = ({ open, setOpen }: Props) => {
                      <Box className="grid place-items-center w-full py-12">
                         <CircularProgress size={24} />
                      </Box>
+                  ) : !recentWorks.length ? (
+                     <Box className="grid place-items-center w-full py-12">
+                        <Typography variant="body1" className="text-foreground2">No recent work found</Typography>
+                     </Box>
                   ) : (
                      <Box className="flex flex-col gap-0.5 overflow-hidden">
                         {recentWorks.map((w) => (
