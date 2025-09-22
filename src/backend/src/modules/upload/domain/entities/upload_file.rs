@@ -9,7 +9,7 @@ pub struct UploadedFile {
     pub filename: String,
     pub content_type: String,
     pub size: u64,
-    pub data: Vec<u8>,
+    pub chunks: Vec<Vec<u8>>, 
     pub owner: Principal,
     pub created_at: u64,
     pub deleted_at: Option<u64>,
