@@ -58,6 +58,84 @@ const Home = () => {
 
    const backend = useBackend();
 
+   const uploadStrategy1 = async (
+      chunks: Uint8Array[],
+      sessionId: string,
+      updateProgress: () => void
+   ) => {
+      // Upload chunks in parallel batches for better performance
+      const BATCH_SIZE = 5; // Upload 5 chunks simultaneously
+
+      for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+         const batch = chunks.slice(i, Math.min(i + BATCH_SIZE, chunks.length));
+         const batchPromises = batch.map(async (chunk, batchIndex) => {
+            const chunkIndex = i + batchIndex;
+
+            try {
+               const result = await backend.upload_chunk({
+                  session_id: sessionId,
+                  chunk_index: BigInt(chunkIndex),
+                  data: chunk,
+               });
+
+               if ("Err" in result) {
+                  throw new Error(`Chunk ${chunkIndex} failed: ${result.Err}`);
+               }
+
+               // Atomic increment and progress update
+               updateProgress();
+
+               return result;
+            } catch (error) {
+               console.error(`Chunk ${chunkIndex} upload failed:`, error);
+               throw error;
+            }
+         });
+
+         // Wait for current batch to complete before starting next batch
+         await Promise.all(batchPromises);
+
+         // Small delay to prevent overwhelming the backend
+         if (i + BATCH_SIZE < chunks.length) {
+            await new Promise((resolve) => setTimeout(resolve, 50));
+         }
+      }
+   };
+
+   // const uploadStrategy2 = async (
+   //    chunks: Uint8Array[],
+   //    sessionId: string,
+   //    updateProgress: () => void
+   // ) => {
+   //    const chunkPromises = [];
+   //    for (let i = 0; i < chunks.length; i++) {
+   //       chunkPromises.push(
+   //          (async () => {
+   //             try {
+   //                const result = await backend.upload_chunk({
+   //                   session_id: sessionId,
+   //                   chunk_index: BigInt(i),
+   //                   data: chunks[i],
+   //                });
+
+   //                if ("Err" in result) {
+   //                   throw new Error(`Chunk ${i} failed: ${result.Err}`);
+   //                }
+
+   //                // Atomic increment and progress update
+   //                updateProgress();
+   //                console.log("chunk", i, "selesai");
+   //             } catch (error) {
+   //                console.error(`Chunk ${i} upload failed:`, error);
+   //                throw error;
+   //             }
+   //          })()
+   //       );
+   //    }
+
+   //    await Promise.all(chunkPromises);
+   // };
+
    const uploadFile = async (file: File) => {
       try {
          setUploading(true);
@@ -94,6 +172,7 @@ const Home = () => {
          const progressLock = { current: 0 }; // Prevent progress from going backwards
 
          const updateProgress = () => {
+            completedChunks++;
             const newProgress = Math.min(
                (completedChunks / totalChunks) * 70,
                70
@@ -104,49 +183,9 @@ const Home = () => {
             }
          };
 
-         // Upload chunks in parallel batches for better performance
-         const BATCH_SIZE = 5; // Upload 5 chunks simultaneously
+         await uploadStrategy1(chunks, sessionId, updateProgress);
 
-         for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
-            const batch = chunks.slice(
-               i,
-               Math.min(i + BATCH_SIZE, chunks.length)
-            );
-            const batchPromises = batch.map(async (chunk, batchIndex) => {
-               const chunkIndex = i + batchIndex;
-
-               try {
-                  const result = await backend.upload_chunk({
-                     session_id: sessionId,
-                     chunk_index: BigInt(chunkIndex),
-                     data: chunk,
-                  });
-
-                  if ("Err" in result) {
-                     throw new Error(
-                        `Chunk ${chunkIndex} failed: ${result.Err}`
-                     );
-                  }
-
-                  // Atomic increment and progress update
-                  completedChunks++;
-                  updateProgress();
-
-                  return result;
-               } catch (error) {
-                  console.error(`Chunk ${chunkIndex} upload failed:`, error);
-                  throw error;
-               }
-            });
-
-            // Wait for current batch to complete before starting next batch
-            await Promise.all(batchPromises);
-
-            // Small delay to prevent overwhelming the backend
-            if (i + BATCH_SIZE < chunks.length) {
-               await new Promise((resolve) => setTimeout(resolve, 50));
-            }
-         }
+         // await uploadStrategy2(chunks, sessionId, updateProgress)
 
          // Complete upload
          setUploadStatus("processing");
@@ -168,7 +207,7 @@ const Home = () => {
          }
          const transcribeJobId = startTranscribeJob.Ok;
 
-         console.log('transcribeJobId', transcribeJobId)
+         console.log("transcribeJobId", transcribeJobId);
 
          // Optimized polling with exponential backoff
          let pollInterval = 2000; // Start with 2 seconds
@@ -207,7 +246,7 @@ const Home = () => {
          const transcriptionResult = await backend.get_transcription_result(
             transcribeJobId
          );
-         
+
          if ("Err" in transcriptionResult) {
             throw new Error(transcriptionResult.Err);
          }

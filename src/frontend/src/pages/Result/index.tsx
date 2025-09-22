@@ -10,7 +10,6 @@ import {
 } from "@mui/material";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import exampleVideo from "@/assets/video/example.mp4";
 import {
    MdChevronLeft,
    MdContentCopy,
@@ -20,6 +19,8 @@ import {
    MdClose,
    MdBookmark,
    MdBookmarkBorder,
+   MdRefresh,
+   MdDownload,
 } from "react-icons/md";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import ModalDelete from "./components/ModalDelete";
@@ -28,6 +29,7 @@ import { useBackend } from "@/hooks/useBackend";
 import { UserFileArtifact } from "declarations/backend/backend.did";
 import { formatRelativeTime, formatTime } from "@/utils/dateUtils";
 import { useAuth } from "@ic-reactor/react";
+import { useChunkedMedia } from "@/hooks/useChunkedMedia";
 
 const HighlightText = ({
    text,
@@ -64,6 +66,21 @@ const HighlightText = ({
    );
 };
 
+// Helper function to format file size
+const formatFileSize = (bytes: bigint): string => {
+   const size = Number(bytes);
+   const units = ["B", "KB", "MB", "GB"];
+   let unitIndex = 0;
+   let fileSize = size;
+
+   while (fileSize >= 1024 && unitIndex < units.length - 1) {
+      fileSize /= 1024;
+      unitIndex++;
+   }
+
+   return `${fileSize.toFixed(1)} ${units[unitIndex]}`;
+};
+
 const Result = () => {
    const [selectedTab, setSelectedTab] = useState<"transcript" | "summary">(
       "transcript"
@@ -76,15 +93,37 @@ const Result = () => {
    const [loadingBookmark, setLoadingBookmark] = useState(false);
    const [showSearch, setShowSearch] = useState(false);
    const [searchTerm, setSearchTerm] = useState("");
+   const [localMediaUrl, setLocalMediaUrl] = useState("");
 
    const { identity } = useAuth();
    const location = useLocation();
+   const navigate = useNavigate();
    const { id } = useParams();
    const setSnackbar = useSnackbarStore((s) => s.setSnackbar);
    const searchInputRef = useRef<HTMLInputElement>(null);
+   const backend = useBackend();
 
    const { videoUrl } = location.state || {};
-   const _videoUrl = videoUrl || exampleVideo;
+   console.log("videoUrl", videoUrl);
+
+   // Initialize chunked media hook
+   const {
+      mediaUrl,
+      isLoading: isMediaLoading,
+      loadingProgress,
+      error: mediaError,
+      totalSize,
+      loadedSize,
+      loadMedia,
+      reset: resetMedia,
+      downloadFile,
+   } = useChunkedMedia(work?.artifact || null, backend, {
+      chunkSize: 1024 * 1024, // 1MB chunks
+      preloadChunks: 5, // Load first 5MB
+      autoLoad: false,
+   });
+
+   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
 
    // Debounced search function
    const debouncedSetSearch = useMemo(
@@ -141,9 +180,6 @@ const Result = () => {
       setSelectedTab(value);
    };
 
-   const backend = useBackend();
-   const navigate = useNavigate();
-
    const debounced = useMemo(
       () =>
          debounce(() => {
@@ -171,8 +207,6 @@ const Result = () => {
          });
       }
    };
-
-   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
 
    const handleSeekTo = (timeInSeconds: number) => {
       if (mediaRef.current) {
@@ -235,17 +269,6 @@ const Result = () => {
       }
    };
 
-   // const handleGetFile = async () => {
-   //    const file = await backend.get_file_chunk({
-   //       file_id: id!,
-   //       length: BigInt(0),
-   //       start: BigInt(0),
-   //    });
-   //    if ("Ok" in file) {
-   //       console.log(file.Ok);
-   //    }
-   // };
-
    const debounceUpdateTitle = useMemo(
       () =>
          debounce((title: string) => {
@@ -269,15 +292,53 @@ const Result = () => {
       debounceUpdateTitle(e.target.value);
    };
 
-   useEffect(() => {
-      if (!videoUrl) {
-         // handleGetFile();
+   // Handle media retry
+   const handleRetryMedia = () => {
+      if (mediaError) {
+         resetMedia();
+         setTimeout(() => {
+            loadMedia();
+         }, 100);
       }
-   }, [videoUrl]);
+   };
+
+   // Handle download media
+   const handleDownloadMedia = () => {
+      if (mediaUrl) {
+         downloadFile();
+      }
+   };
 
    useEffect(() => {
       handleGetDetail();
    }, []);
+
+   useEffect(() => {
+      if (mediaError) {
+         setSnackbar({
+            message: `Media loading error: ${mediaError}`,
+         });
+      }
+   }, [mediaError]);
+
+   useEffect(() => {
+      if (videoUrl) {
+         setLocalMediaUrl(videoUrl);
+         console.log("removing state");
+         navigate(location.pathname, { replace: true });
+      }
+   }, [videoUrl]);
+
+   useEffect(() => {
+      if (work && !localMediaUrl) {
+         // backend.get_file_chunk({
+         //    file_id: work.artifact.file_id,
+         //    start: BigInt(0),
+         //    length: BigInt(1024),
+         // })
+         loadMedia();
+      }
+   }, [work, localMediaUrl]);
 
    return (
       <Box className="px-5 pt-28 pb-20 container mx-auto">
@@ -322,7 +383,10 @@ const Result = () => {
                            <input
                               type="text"
                               className="absolute left-0 top-1/2 -translate-y-1/2 focus:outline-none focus:border-b border-background3 font-bold text-[22px] p-0 w-full"
-                              value={work?.artifact.title}
+                              value={
+                                 work?.artifact.title[0] ||
+                                 work?.artifact.filename
+                              }
                               onChange={handleChangeTitle}
                            />
                         )}
@@ -334,7 +398,7 @@ const Result = () => {
                                  : ""
                            }`}
                         >
-                           {work?.artifact.title}
+                           {work?.artifact.title[0] || work?.artifact.filename}
                         </h1>
                      </Box>
                      <p className="font-bold text-foreground2">
@@ -373,24 +437,144 @@ const Result = () => {
 
          <Box className="flex gap-5 items-start">
             <Box className="grow basis-0 rounded-lg overflow-hidden sticky top-20 self-start">
-               {work?.artifact.content_type.startsWith("video") ? (
-                  <video
-                     ref={mediaRef as React.RefObject<HTMLVideoElement>}
-                     src={exampleVideo}
-                     controls
-                     className="w-full rounded-xl"
-                  />
-               ) : work?.artifact.content_type.startsWith("audio") ? (
-                  <audio
-                     controls
-                     ref={mediaRef as React.RefObject<HTMLAudioElement>}
-                     className="w-full"
-                  >
-                     <source src={_videoUrl} type="audio/mp3" />
-                     Your browser does not support the audio element.
-                  </audio>
-               ) : (
-                  "This type of file is not supported"
+               {/* Media Loading State */}
+               {isMediaLoading && (
+                  <Box className="relative bg-gray-100 rounded-xl h-64 flex flex-col items-center justify-center">
+                     <CircularProgress size={40} className="mb-4" />
+                     <p className="text-sm font-medium text-gray-700 mb-2">
+                        Loading media...
+                     </p>
+                     <Box className="w-80 bg-gray-200 rounded-full h-2">
+                        <Box
+                           className="bg-primary h-2 rounded-full transition-all duration-300"
+                           style={{ width: `${loadingProgress}%` }}
+                        />
+                     </Box>
+                     <p className="text-xs text-gray-600 mt-2">
+                        {loadingProgress.toFixed(1)}%
+                        {totalSize && loadedSize && (
+                           <span className="ml-2">
+                              ({formatFileSize(loadedSize)} /{" "}
+                              {formatFileSize(totalSize)})
+                           </span>
+                        )}
+                     </p>
+                  </Box>
+               )}
+
+               {/* Media Error State */}
+               {mediaError && !isMediaLoading && (
+                  <Box className="bg-red-50 border border-red-200 rounded-xl p-6">
+                     <Box className="flex items-center gap-3 text-red-800 mb-3">
+                        <Box className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                           <span className="text-red-600">⚠</span>
+                        </Box>
+                        <Box>
+                           <p className="font-medium">Failed to load media</p>
+                           <p className="text-sm text-red-600">{mediaError}</p>
+                        </Box>
+                     </Box>
+                     <Box className="flex gap-2">
+                        <button
+                           onClick={handleRetryMedia}
+                           className="flex items-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-800 rounded-lg transition-colors"
+                        >
+                           <MdRefresh className="text-lg" />
+                           Retry
+                        </button>
+                     </Box>
+                  </Box>
+               )}
+
+               {/* Media Player */}
+               {!isMediaLoading && !mediaError && (
+                  <Box className="relative">
+                     {/* Media Controls Overlay */}
+                     <Box className="absolute top-2 right-2 z-10 flex gap-1">
+                        <Tooltip title="Download media">
+                           <IconButton
+                              onClick={handleDownloadMedia}
+                              className="bg-black/50 text-white hover:bg-black/70"
+                              size="small"
+                              disabled={!mediaUrl}
+                           >
+                              <MdDownload />
+                           </IconButton>
+                        </Tooltip>
+                        {/* <Tooltip title="Load full quality">
+                           <IconButton
+                              onClick={handleLoadFullQuality}
+                              className="bg-black/50 text-white hover:bg-black/70"
+                              size="small"
+                              disabled={!work?.artifact}
+                           >
+                              <MdHd />
+                           </IconButton>
+                        </Tooltip> */}
+                     </Box>
+
+                     {work?.artifact.content_type.startsWith("video") ? (
+                        <video
+                           ref={mediaRef as React.RefObject<HTMLVideoElement>}
+                           src={localMediaUrl || mediaUrl || ""}
+                           controls
+                           className="w-full rounded-xl"
+                           onError={(e) => {
+                              console.error("Video playback error:", e);
+                           }}
+                        />
+                     ) : work?.artifact.content_type.startsWith("audio") ? (
+                        <Box className="bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl p-8">
+                           <Box className="flex items-center justify-center mb-4">
+                              <Box className="w-16 h-16 bg-white/80 rounded-full flex items-center justify-center">
+                                 <span className="text-2xl">🎵</span>
+                              </Box>
+                           </Box>
+                           <audio
+                              controls
+                              ref={
+                                 mediaRef as React.RefObject<HTMLAudioElement>
+                              }
+                              className="w-full"
+                              src={localMediaUrl || mediaUrl || ""}
+                              onError={(e) => {
+                                 console.error("Audio playback error:", e);
+                              }}
+                           >
+                              Your browser does not support the audio element.
+                           </audio>
+                           <Box className="text-center mt-4">
+                              <p className="font-medium text-gray-800">
+                                 {work?.artifact.title[0] ||
+                                    work?.artifact.filename}
+                              </p>
+                              {totalSize && (
+                                 <p className="text-sm text-gray-600">
+                                    {formatFileSize(totalSize)}
+                                 </p>
+                              )}
+                           </Box>
+                        </Box>
+                     ) : (
+                        <Box className="bg-gray-100 rounded-xl p-8 text-center">
+                           <p className="text-gray-600">
+                              This type of file is not supported for playback
+                           </p>
+                           <p className="text-sm text-gray-500 mt-2">
+                              Content type: {work?.artifact.content_type}
+                           </p>
+                           {mediaUrl && (
+                              <button
+                                 onClick={handleDownloadMedia}
+                                 className="mt-4 flex items-center gap-2 mx-auto px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/80 transition-colors"
+                              >
+                                 <MdDownload />
+                                 Download File
+                              </button>
+                           )}
+                        </Box>
+                     )}
+                  </Box>
                )}
             </Box>
 
