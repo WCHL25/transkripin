@@ -46,17 +46,6 @@ export const idlFactory = ({ IDL }) => {
     'file_id' : IDL.Text,
   });
   const Result_2 = IDL.Variant({ 'Ok' : FileArtifact, 'Err' : IDL.Text });
-  const UploadedFile = IDL.Record({
-    'id' : IDL.Text,
-    'owner' : IDL.Principal,
-    'data' : IDL.Vec(IDL.Nat8),
-    'size' : IDL.Nat64,
-    'content_type' : IDL.Text,
-    'created_at' : IDL.Nat64,
-    'filename' : IDL.Text,
-    'deleted_at' : IDL.Opt(IDL.Nat64),
-  });
-  const Result_3 = IDL.Variant({ 'Ok' : UploadedFile, 'Err' : IDL.Text });
   const UserFileArtifact = IDL.Record({
     'artifact' : FileArtifact,
     'is_bookmarked' : IDL.Bool,
@@ -70,7 +59,7 @@ export const idlFactory = ({ IDL }) => {
     'data' : IDL.Vec(IDL.Nat8),
     'total_size' : IDL.Nat64,
   });
-  const Result_4 = IDL.Variant({
+  const Result_3 = IDL.Variant({
     'Ok' : DownloadChunkResponse,
     'Err' : IDL.Text,
   });
@@ -79,8 +68,8 @@ export const idlFactory = ({ IDL }) => {
     'Completed' : IDL.Text,
     'Pending' : IDL.Null,
   });
-  const Result_5 = IDL.Variant({ 'Ok' : JobStatus, 'Err' : IDL.Text });
-  const Result_6 = IDL.Variant({
+  const Result_4 = IDL.Variant({ 'Ok' : JobStatus, 'Err' : IDL.Text });
+  const Result_5 = IDL.Variant({
     'Ok' : IDL.Tuple(IDL.Nat64, IDL.Nat64),
     'Err' : IDL.Text,
   });
@@ -120,18 +109,17 @@ export const idlFactory = ({ IDL }) => {
     'delete_file' : IDL.Func([IDL.Text], [Result], []),
     'delete_file_artifact' : IDL.Func([IDL.Text], [Result_1], []),
     'edit_file_artifact' : IDL.Func([FileArtifactRequest], [Result_2], []),
-    'get_file' : IDL.Func([IDL.Text], [Result_3], ['query']),
     'get_file_artifact' : IDL.Func(
         [IDL.Text],
         [IDL.Opt(UserFileArtifact)],
         ['query'],
       ),
-    'get_file_chunk' : IDL.Func([DownloadChunkRequest], [Result_4], ['query']),
+    'get_file_chunk' : IDL.Func([DownloadChunkRequest], [Result_3], ['query']),
     'get_summary_result' : IDL.Func([IDL.Text], [JobStatus], ['query']),
     'get_transcription' : IDL.Func([IDL.Text], [Result], ['query']),
     'get_transcription_result' : IDL.Func([IDL.Text], [Result], []),
-    'get_transcription_status' : IDL.Func([IDL.Text], [Result_5], []),
-    'get_upload_status' : IDL.Func([IDL.Text], [Result_6], ['query']),
+    'get_transcription_status' : IDL.Func([IDL.Text], [Result_4], []),
+    'get_upload_status' : IDL.Func([IDL.Text], [Result_5], ['query']),
     'get_user_id' : IDL.Func([IDL.Principal], [IDL.Text], ['query']),
     'list_saved_file_artifacts' : IDL.Func(
         [IDL.Opt(FileArtifactFilter)],

@@ -13,16 +13,10 @@ use crate::{
 
 pub async fn call_transcription(file: UploadedFile) -> Result<String, String> {
     let boundary = "----ic_boundary";
-    let chunk_size = 1_900_000; // ~1.9 MB
     let session_id = file.id.clone();
 
-    let mut offset = 0;
-    let mut chunk_index = 0;
-
-    while offset < file.data.len() {
-        let end = usize::min(offset + chunk_size, file.data.len());
-        let chunk = &file.data[offset..end];
-
+    // Upload each chunk
+    for (chunk_index, chunk) in file.chunks.iter().enumerate() {
         // Build multipart body for chunk
         let mut body = Vec::new();
 
@@ -77,9 +71,6 @@ pub async fn call_transcription(file: UploadedFile) -> Result<String, String> {
         http_request(request, cycles.into()).await.map_err(|e|
             format!("Chunk {} upload failed: {:?}", chunk_index, e)
         )?;
-
-        offset = end;
-        chunk_index += 1;
     }
 
     // Tell server we're done uploading

@@ -160,8 +160,6 @@ pub fn get_upload_status(session_id: String) -> Result<(u64, u64), String> {
 #[query]
 pub fn get_file_chunk(request: DownloadChunkRequest) -> Result<DownloadChunkResponse, String> {
     let caller = ic_cdk::api::caller();
-
-    // Visibility check
     check_artifact_visibility(&request.file_id, caller)?;
 
     UPLOADED_FILES.with(|files| {
@@ -172,31 +170,26 @@ pub fn get_file_chunk(request: DownloadChunkRequest) -> Result<DownloadChunkResp
             return Err("Invalid start position".to_string());
         }
 
-        let mut remaining = request.length;
+        let mut remaining = request.length as usize;
         let mut offset = request.start as usize;
-        let mut data = Vec::with_capacity(request.length as usize);
+        let mut data = Vec::with_capacity(remaining);
 
-        let mut chunk_start = 0;
         for chunk in &file.chunks {
-            let chunk_end = chunk_start + chunk.len();
-
-            if offset >= chunk_end {
-                chunk_start = chunk_end;
-                continue;
-            }
-
-            let start_in_chunk = offset.saturating_sub(chunk_start);
-            let take = std::cmp::min(remaining as usize, chunk.len() - start_in_chunk);
-
-            data.extend_from_slice(&chunk[start_in_chunk..start_in_chunk + take]);
-
-            remaining -= take as u64;
-            offset += take;
-            chunk_start = chunk_end;
-
             if remaining == 0 {
                 break;
             }
+
+            let chunk_len = chunk.len();
+            if offset >= chunk_len {
+                offset -= chunk_len; // skip this chunk
+                continue;
+            }
+
+            let take = std::cmp::min(remaining, chunk_len - offset);
+            data.extend_from_slice(&chunk[offset..offset + take]);
+
+            remaining -= take;
+            offset = 0; // after first chunk, start from 0 in following chunks
         }
 
         Ok(DownloadChunkResponse {
