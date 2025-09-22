@@ -1,4 +1,4 @@
-import { Avatar, Box, Button, IconButton, Menu, MenuItem } from "@mui/material";
+import { Avatar, Box, Button, Grow, IconButton, Menu, MenuItem } from "@mui/material";
 import logo from "@/assets/img/logo_blue.svg";
 import { useEffect, useState } from "react";
 import { useAuth, useUpdateCall } from "@ic-reactor/react";
@@ -7,7 +7,11 @@ import { SIDEBAR_WIDTH } from "./Sidebar";
 
 const MAX_SCROLL = 200;
 
-const Header = () => {
+interface Props {
+   hideLogo?: boolean;
+}
+
+const Header = ({ hideLogo = false }: Props) => {
    const [opacity, setOpacity] = useState(window.scrollY / MAX_SCROLL);
    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
    const open = Boolean(anchorEl);
@@ -77,11 +81,17 @@ const Header = () => {
          }}
       >
          <Box className="flex justify-between px-5 container mx-auto w-full">
-            <Box className="flex items-center gap-2">
-               <img src={logo} alt="Transkripin logo" className="w-10" />
+            <Grow in={!hideLogo}>
+            {hideLogo ? (
+               <Box className="invisible select-none touch-none"></Box>
+            ) : (
+               <Box className="flex items-center gap-2">
+                  <img src={logo} alt="Transkripin logo" className="w-10" />
 
-               <span className="font-bold text-lg">Transkripin</span>
-            </Box>
+                  <span className="font-bold text-lg">Transkripin</span>
+               </Box>
+            )}
+            </Grow>
 
             <Box>
                {!isAuthenticated ? (
@@ -103,9 +113,9 @@ const Header = () => {
                         open={open}
                         onClose={handleClose}
                         sx={{
-                           "& .MuiPaper-root":  {
-                              background: 'var(--color-background2)'
-                           }
+                           "& .MuiPaper-root": {
+                              background: "var(--color-background2)",
+                           },
                         }}
                      >
                         <MenuItem onClick={handleLogout}>Logout</MenuItem>

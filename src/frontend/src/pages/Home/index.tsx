@@ -12,6 +12,7 @@ import { fileToChunks } from "@/utils/fileUtils";
 import { useBackend } from "@/hooks/useBackend";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { useNavigate } from "react-router-dom";
+import { useRecentWorkStore } from "@/store/useRecentWorkStore";
 
 const Home = () => {
    const [file, setFile] = useState<File | null>(null);
@@ -25,6 +26,7 @@ const Home = () => {
 
    const setSnackbar = useSnackbarStore((state) => state.setSnackbar);
    const navigate = useNavigate();
+   const reload = useRecentWorkStore(s => s.reload)
 
    const removeFile = () => {
       setFile(null);
@@ -301,6 +303,8 @@ const Home = () => {
          });
 
          const url = URL.createObjectURL(file);
+
+         reload(backend)
 
          navigate(`/works/${fileId}`, {
             state: {

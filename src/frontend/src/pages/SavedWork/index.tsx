@@ -181,7 +181,7 @@ const SavedWork = () => {
             data={selectedWork !== null ? works[selectedWork]?.artifact : null}
             toggleVisibility={handleToggleVisibility}
          />
-         <Box className="flex items-center justify-between gap-5 mb-6">
+         <Box className="flex flex-wrap items-center justify-between gap-5 mb-6">
             <Tabs
                value={selectedTab}
                onChange={handleChangeTab}
@@ -349,7 +349,7 @@ const SavedWork = () => {
             </Box>
          </Box>
 
-         <Box className="grid grid-cols-3 gap-4">
+         <Box className="grid grid-cols-3 max-lg:grid-cols-2 max-md:grid-cols-1 gap-4">
             {loading ? (
                Array.from({ length: 6 }).map((_, idx) => (
                   <SkeletonWorkCard key={idx} />

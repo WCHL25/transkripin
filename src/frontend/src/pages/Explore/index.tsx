@@ -266,7 +266,7 @@ const Explore = () => {
                </Menu>
             </Box>
 
-            <Box className="grid grid-cols-3 gap-4">
+            <Box className="grid grid-cols-3 max-lg:grid-cols-2 max-md:grid-cols-1 gap-4">
                {loading ? (
                   Array.from({ length: 6 }).map((_, idx) => (
                      <SkeletonWorkCard key={idx} isExplore />
