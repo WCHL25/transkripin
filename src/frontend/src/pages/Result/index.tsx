@@ -1,5 +1,6 @@
 import {
    Box,
+   CircularProgress,
    debounce,
    IconButton,
    Skeleton,
@@ -17,6 +18,8 @@ import {
    MdSearch,
    MdShare,
    MdClose,
+   MdBookmark,
+   MdBookmarkBorder,
 } from "react-icons/md";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import ModalDelete from "./components/ModalDelete";
@@ -70,6 +73,7 @@ const Result = () => {
    const [openDelete, setOpenDelete] = useState<boolean>(false);
    const [isCopied, setIsCopied] = useState(false);
    const [loading, setLoading] = useState(true);
+   const [loadingBookmark, setLoadingBookmark] = useState(false);
    const [showSearch, setShowSearch] = useState(false);
    const [searchTerm, setSearchTerm] = useState("");
 
@@ -183,6 +187,7 @@ const Result = () => {
       try {
          const fileArtifact = await backend.get_file_artifact(id!);
          if (fileArtifact.length) {
+            console.log("fileArtifact", fileArtifact);
             setWork(fileArtifact[0] || null);
          } else {
             setSnackbar({
@@ -190,7 +195,6 @@ const Result = () => {
             });
             navigate("/saved");
          }
-         console.log(fileArtifact);
       } catch (error: any) {
          setSnackbar({ message: error.message });
       }
@@ -198,7 +202,7 @@ const Result = () => {
       setLoading(false);
    };
 
-   const toggleVisibility = () => {
+   const handleToggleVisibility = () => {
       if (!work) return;
 
       if ("Public" in work.artifact.visibility) {
@@ -210,8 +214,33 @@ const Result = () => {
       setWork({ ...work });
    };
 
+   const handleToggleBookmark = async () => {
+      if (!work) return;
+
+      setLoadingBookmark(true);
+      const result = await backend.toggle_file_artifact_bookmark(
+         work.artifact.file_id
+      );
+      setLoadingBookmark(false);
+
+      if ("Err" in result) {
+         setSnackbar({
+            message: result.Err,
+         });
+      }
+
+      if ("Ok" in result) {
+         work.is_bookmarked = !work.is_bookmarked;
+         setWork({ ...work });
+      }
+   };
+
    // const handleGetFile = async () => {
-   //    const file = await backend.get_file(id!);
+   //    const file = await backend.get_file_chunk({
+   //       file_id: id!,
+   //       length: BigInt(0),
+   //       start: BigInt(0),
+   //    });
    //    if ("Ok" in file) {
    //       console.log(file.Ok);
    //    }
@@ -242,7 +271,7 @@ const Result = () => {
 
    useEffect(() => {
       if (!videoUrl) {
-         // handleGetFile()
+         // handleGetFile();
       }
    }, [videoUrl]);
 
@@ -261,7 +290,7 @@ const Result = () => {
             open={openShare}
             onClose={() => setOpenShare(false)}
             data={work?.artifact || null}
-            toggleVisibility={toggleVisibility}
+            toggleVisibility={handleToggleVisibility}
          />
 
          <Link
@@ -317,7 +346,22 @@ const Result = () => {
                )}
             </Box>
 
-            <Box className="flex gap-5 items-center">
+            <Box className="flex gap-2 items-center">
+               {work?.artifact.owner.toText() !=
+                  identity?.getPrincipal().toText() && (
+                  <IconButton
+                     onClick={handleToggleBookmark}
+                     disabled={loadingBookmark}
+                  >
+                     {loadingBookmark ? (
+                        <CircularProgress size={20} />
+                     ) : work?.is_bookmarked ? (
+                        <MdBookmark className="text-2xl text-foreground" />
+                     ) : (
+                        <MdBookmarkBorder className="text-2xl text-foreground" />
+                     )}
+                  </IconButton>
+               )}
                <IconButton onClick={() => setOpenShare(true)}>
                   <MdShare className="text-2xl text-foreground" />
                </IconButton>
