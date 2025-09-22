@@ -14,8 +14,8 @@ import {
    MenuItem,
 } from "@mui/material";
 import {
-   FileArtifact,
    FileArtifactFilter,
+   UserFileArtifact,
 } from "declarations/backend/backend.did";
 import { useEffect, useMemo, useState } from "react";
 import { MdCheck, MdChevronRight, MdSearch } from "react-icons/md";
@@ -26,7 +26,7 @@ const Explore = () => {
       null
    );
 
-   const [works, setWorks] = useState<FileArtifact[]>([]);
+   const [works, setWorks] = useState<UserFileArtifact[]>([]);
    const [loading, setLoading] = useState(true);
 
    const [searchInput, setSearchInput] = useState("");
@@ -239,7 +239,7 @@ const Explore = () => {
                   />
                ) : (
                   works.map((w) => (
-                     <WorkCard key={w.file_id} work={w} isExplore />
+                     <WorkCard key={w.artifact.file_id} work={w} isExplore />
                   ))
                )}
             </Box>

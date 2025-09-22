@@ -22,10 +22,9 @@ import { useSnackbarStore } from "@/store/useSnackbarStore";
 import ModalDelete from "./components/ModalDelete";
 import ModalShare from "./components/ModalShare";
 import { useBackend } from "@/hooks/useBackend";
-import { FileArtifact } from "declarations/backend/backend.did";
+import { UserFileArtifact } from "declarations/backend/backend.did";
 import { formatRelativeTime, formatTime } from "@/utils/dateUtils";
 
-// Component untuk highlight text
 const HighlightText = ({
    text,
    searchTerm,
@@ -65,7 +64,7 @@ const Result = () => {
    const [selectedTab, setSelectedTab] = useState<"transcript" | "summary">(
       "transcript"
    );
-   const [work, setWork] = useState<FileArtifact | null>(null);
+   const [work, setWork] = useState<UserFileArtifact | null>(null);
    const [openShare, setOpenShare] = useState<boolean>(false);
    const [openDelete, setOpenDelete] = useState<boolean>(false);
    const [isCopied, setIsCopied] = useState(false);
@@ -92,14 +91,14 @@ const Result = () => {
 
    // Filter transcript segments berdasarkan search
    const filteredSegments = useMemo(() => {
-      if (!work?.transcription[0]?.segments || !searchTerm.trim()) {
-         return work?.transcription[0]?.segments || [];
+      if (!work?.artifact.transcription[0]?.segments || !searchTerm.trim()) {
+         return work?.artifact.transcription[0]?.segments || [];
       }
 
-      return work.transcription[0].segments.filter((segment) =>
+      return work.artifact.transcription[0].segments.filter((segment) =>
          segment.text.toLowerCase().includes(searchTerm.toLowerCase())
       );
-   }, [work?.transcription, searchTerm]);
+   }, [work?.artifact.transcription, searchTerm]);
 
    // Handle search input change
    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -148,8 +147,8 @@ const Result = () => {
       try {
          await navigator.clipboard.writeText(
             selectedTab == "summary"
-               ? work.summary[0]!.text
-               : JSON.stringify(work.transcription[0]!.text)
+               ? work.artifact.summary[0]!.text
+               : JSON.stringify(work.artifact.transcription[0]!.text)
          );
 
          setIsCopied(true);
@@ -188,10 +187,10 @@ const Result = () => {
    const toggleVisibility = () => {
       if (!work) return;
 
-      if ("Public" in work.visibility) {
-         work.visibility = { Private: null };
+      if ("Public" in work.artifact.visibility) {
+         work.artifact.visibility = { Private: null };
       } else {
-         work.visibility = { Public: null };
+         work.artifact.visibility = { Public: null };
       }
 
       setWork({ ...work });
@@ -219,12 +218,12 @@ const Result = () => {
          <ModalDelete
             open={openDelete}
             onClose={() => setOpenDelete(false)}
-            data={work}
+            data={work?.artifact || null}
          />
          <ModalShare
             open={openShare}
             onClose={() => setOpenShare(false)}
-            data={work}
+            data={work?.artifact || null}
             toggleVisibility={toggleVisibility}
          />
 
@@ -252,10 +251,10 @@ const Result = () => {
                ) : (
                   <>
                      <h1 className="font-bold text-[22px] mb-0.5">
-                        {work?.title}
+                        {work?.artifact.title}
                      </h1>
                      <p className="font-bold text-foreground2">
-                        {formatRelativeTime(work!.created_at)}
+                        {formatRelativeTime(work!.artifact.created_at)}
                      </p>
                   </>
                )}
@@ -273,14 +272,14 @@ const Result = () => {
 
          <Box className="flex gap-5 items-start">
             <Box className="grow basis-0 rounded-lg overflow-hidden sticky top-20 self-start">
-               {work?.content_type.startsWith("video") ? (
+               {work?.artifact.content_type.startsWith("video") ? (
                   <video
                      ref={mediaRef as React.RefObject<HTMLVideoElement>}
                      src={exampleVideo}
                      controls
                      className="w-full rounded-xl"
                   />
-               ) : work?.content_type.startsWith("audio") ? (
+               ) : work?.artifact.content_type.startsWith("audio") ? (
                   <audio
                      controls
                      ref={mediaRef as React.RefObject<HTMLAudioElement>}
@@ -359,7 +358,7 @@ const Result = () => {
                         {selectedTab === "transcript" ? (
                            <span>
                               {filteredSegments.length} of{" "}
-                              {work?.transcription[0]?.segments.length || 0}{" "}
+                              {work?.artifact.transcription[0]?.segments.length || 0}{" "}
                               segments match "{searchTerm}"
                            </span>
                         ) : (
@@ -397,7 +396,7 @@ const Result = () => {
                         ) : (
                            <div className="text-sm leading-relaxed">
                               <HighlightText
-                                 text={work?.summary[0]?.text || ""}
+                                 text={work?.artifact.summary[0]?.text || ""}
                                  searchTerm={searchTerm}
                               />
                            </div>
@@ -430,7 +429,7 @@ const Result = () => {
                            : // Show filtered segments if searching, otherwise show all
                              (searchTerm
                                 ? filteredSegments
-                                : work?.transcription[0]?.segments || []
+                                : work?.artifact.transcription[0]?.segments || []
                              ).map((s) => {
                                 const startTime = formatTime(s.start);
 

@@ -24,8 +24,8 @@ import {
    Tabs,
 } from "@mui/material";
 import {
-   FileArtifact,
    FileArtifactFilter,
+   UserFileArtifact,
 } from "declarations/backend/backend.did";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -52,7 +52,7 @@ const SavedWork = () => {
       sort: [{ Newest: null }],
    });
 
-   const [works, setWorks] = useState<FileArtifact[]>([]);
+   const [works, setWorks] = useState<UserFileArtifact[]>([]);
 
    const debouncedSearch = debounce((q: string) => {
       setFilter((p) => ({ ...p, search: [q] }));
@@ -329,7 +329,7 @@ const SavedWork = () => {
                   onReset={handleResetFilter}
                />
             ) : (
-               works.map((w) => <WorkCard key={w.file_id} work={w} />)
+               works.map((w) => <WorkCard key={w.artifact.file_id} work={w} />)
             )}
          </Box>
       </Box>
