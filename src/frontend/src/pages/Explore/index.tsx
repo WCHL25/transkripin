@@ -84,6 +84,12 @@ const Explore = () => {
       return "no-data";
    };
 
+   const handleToggleBookmark = (fileId: string) => {
+      const idx = works.findIndex(w => w.artifact.file_id == fileId)
+      works[idx].is_bookmarked = !works[idx].is_bookmarked
+      setWorks([...works])
+   }
+
    useEffect(() => {
       handleListFileArtifacts();
    }, [filter]);
@@ -239,7 +245,7 @@ const Explore = () => {
                   />
                ) : (
                   works.map((w) => (
-                     <WorkCard key={w.artifact.file_id} work={w} isExplore />
+                     <WorkCard key={w.artifact.file_id} work={w} isExplore onToggleBookmark={handleToggleBookmark} />
                   ))
                )}
             </Box>

@@ -8,7 +8,7 @@ import {
    Tooltip,
 } from "@mui/material";
 import { useEffect, useRef, useState, useMemo } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import exampleVideo from "@/assets/video/example.mp4";
 import {
    MdChevronLeft,
@@ -136,6 +136,7 @@ const Result = () => {
    };
 
    const backend = useBackend();
+   const navigate = useNavigate()
 
    const debounced = debounce(() => {
       setIsCopied(false);
@@ -175,7 +176,12 @@ const Result = () => {
 
       try {
          const fileArtifact = await backend.get_file_artifact(id!);
-         setWork(fileArtifact[0] || null);
+         if(fileArtifact.length) {
+            setWork(fileArtifact[0] || null);
+         } else {
+            setSnackbar({ message: "You dont have permission to open this work" });
+            navigate('/saved');
+         }
          console.log(fileArtifact);
       } catch (error: any) {
          setSnackbar({ message: error.message });
@@ -254,7 +260,7 @@ const Result = () => {
                         {work?.artifact.title}
                      </h1>
                      <p className="font-bold text-foreground2">
-                        {formatRelativeTime(work!.artifact.created_at)}
+                        {work ? formatRelativeTime(work.artifact.created_at) : '-'}
                      </p>
                   </>
                )}

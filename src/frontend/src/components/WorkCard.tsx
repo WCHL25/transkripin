@@ -2,7 +2,7 @@ import { useBackend } from "@/hooks/useBackend";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { formatRelativeTime } from "@/utils/dateUtils";
 import { useAuth } from "@ic-reactor/react";
-import { Box, Button, IconButton, Tooltip } from "@mui/material";
+import { Box, Button, CircularProgress, IconButton, Tooltip } from "@mui/material";
 import { UserFileArtifact } from "declarations/backend/backend.did";
 import { useMemo, useState } from "react";
 import {
@@ -19,9 +19,10 @@ import { Link } from "react-router-dom";
 interface Props {
    work: UserFileArtifact;
    isExplore?: boolean;
+   onToggleBookmark?: (fileId: string) => void;
 }
 
-const WorkCard = ({ work, isExplore = false }: Props) => {
+const WorkCard = ({ work, isExplore = false, onToggleBookmark }: Props) => {
    const date = useMemo(() => {
       return formatRelativeTime(work.artifact.created_at);
    }, [work.artifact.created_at]);
@@ -43,6 +44,10 @@ const WorkCard = ({ work, isExplore = false }: Props) => {
          setSnackbar({
             message: result.Err,
          });
+      }
+
+      if ("Ok" in result && onToggleBookmark) {
+         onToggleBookmark(work.artifact.file_id);
       }
    };
 
@@ -85,7 +90,7 @@ const WorkCard = ({ work, isExplore = false }: Props) => {
                   </Tooltip>
                ) : (
                   <IconButton onClick={handleToggleBookmark} disabled={loading}>
-                     {work.is_bookmarked ? (
+                     {loading ? <CircularProgress size={18} /> : work.is_bookmarked ? (
                         <MdBookmark className="text-foreground" />
                      ) : (
                         <MdBookmarkBorder className="text-foreground" />
