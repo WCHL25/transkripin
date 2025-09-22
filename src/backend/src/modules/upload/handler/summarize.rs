@@ -16,7 +16,12 @@ use crate::{
                 UserBookmarks,
                 UserFileArtifact,
             },
-            service::{ call_ollama, fetch_file_artifacts, save_file_artifact },
+            service::{
+                call_ollama,
+                fetch_file_artifacts,
+                save_file_artifact,
+                check_artifact_accessible,
+            },
         },
     },
     FILE_ARTIFACTS,
@@ -151,6 +156,7 @@ pub fn get_file_artifact(file_id: String) -> Option<UserFileArtifact> {
     FILE_ARTIFACTS.with(|map| {
         map.borrow()
             .get(&file_id)
+            .filter(|artifact| check_artifact_accessible(&caller, artifact))
             .map(|artifact| {
                 let is_bookmarked = USER_BOOKMARKS.with(|ub| {
                     ub.borrow()
@@ -263,7 +269,11 @@ pub fn list_saved_file_artifacts(filter: Option<FileArtifactFilter>) -> Vec<User
     });
 
     // Use fetch_file_artifacts with a filter_fn that only allows bookmarked files
-    fetch_file_artifacts(|artifact| file_ids.contains(&artifact.file_id), filter)
+    fetch_file_artifacts(
+        |artifact|
+            file_ids.contains(&artifact.file_id) && check_artifact_accessible(&caller, artifact),
+        filter
+    )
 }
 
 /// Search all file artifacts
@@ -271,10 +281,7 @@ pub fn list_saved_file_artifacts(filter: Option<FileArtifactFilter>) -> Vec<User
 pub fn search_file_artifacts(filter: Option<FileArtifactFilter>) -> Vec<UserFileArtifact> {
     let caller = ic_cdk::api::caller();
 
-    fetch_file_artifacts(
-        |artifact| (artifact.visibility.is_public() || artifact.owner == caller),
-        filter
-    )
+    fetch_file_artifacts(|artifact| check_artifact_accessible(&caller, artifact), filter)
 }
 
 /// Toggle visibility of a file artifact
@@ -316,7 +323,7 @@ pub fn toggle_file_artifact_bookmark(file_id: String) -> Result<String, String> 
 
         match map.get(&file_id) {
             Some(artifact) => {
-                if !artifact.visibility.is_public() && artifact.owner != caller {
+                if !check_artifact_accessible(&caller, &artifact) {
                     return Err("You cannot bookmark this private artifact".to_string());
                 }
 

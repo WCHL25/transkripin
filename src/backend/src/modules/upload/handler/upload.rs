@@ -102,20 +102,9 @@ pub async fn complete_upload(session_id: String) -> Result<String, String> {
                 if session.owner != caller {
                     return Err("Unauthorized: You don't own this upload session".to_string());
                 }
+
                 if session.uploaded_chunks.len() != (session.total_chunks as usize) {
                     return Err("Not all chunks have been uploaded".to_string());
-                }
-
-                let mut file_data = Vec::new();
-                for chunk in &session.uploaded_chunks {
-                    if chunk.is_empty() {
-                        return Err("Missing chunk data".to_string());
-                    }
-                    file_data.extend_from_slice(chunk);
-                }
-
-                if file_data.len() != (session.total_size as usize) {
-                    return Err("File size mismatch".to_string());
                 }
 
                 let file_id = generate_id();
@@ -126,7 +115,7 @@ pub async fn complete_upload(session_id: String) -> Result<String, String> {
                     filename: session.filename,
                     content_type: session.content_type,
                     size: session.total_size,
-                    data: file_data,
+                    chunks: session.uploaded_chunks,
                     owner: caller,
                     created_at: created_at,
                     deleted_at: None,
@@ -169,22 +158,6 @@ pub fn get_upload_status(session_id: String) -> Result<(u64, u64), String> {
 }
 
 #[query]
-pub fn get_file(file_id: String) -> Result<UploadedFile, String> {
-    let caller = ic_cdk::api::caller();
-
-    // Visibility check
-    check_artifact_visibility(&file_id, caller)?;
-
-    UPLOADED_FILES.with(|files| {
-        let files = files.borrow();
-        match files.get(&file_id) {
-            Some(file) => Ok(file),
-            None => Err("File not found".to_string()),
-        }
-    })
-}
-
-#[query]
 pub fn get_file_chunk(request: DownloadChunkRequest) -> Result<DownloadChunkResponse, String> {
     let caller = ic_cdk::api::caller();
 
@@ -193,18 +166,43 @@ pub fn get_file_chunk(request: DownloadChunkRequest) -> Result<DownloadChunkResp
 
     UPLOADED_FILES.with(|files| {
         let files = files.borrow();
-        let file = files.get(&request.file_id).ok_or_else(|| "File not found".to_string())?;
+        let file = files.get(&request.file_id).ok_or("File not found")?;
 
-        let total_size = file.size;
-        let end = std::cmp::min(request.start + request.length, total_size);
-
-        if request.start >= end {
+        if request.start >= file.size {
             return Err("Invalid start position".to_string());
         }
 
-        let data = file.data[request.start as usize..end as usize].to_vec();
+        let mut remaining = request.length;
+        let mut offset = request.start as usize;
+        let mut data = Vec::with_capacity(request.length as usize);
 
-        Ok(DownloadChunkResponse { data, total_size })
+        let mut chunk_start = 0;
+        for chunk in &file.chunks {
+            let chunk_end = chunk_start + chunk.len();
+
+            if offset >= chunk_end {
+                chunk_start = chunk_end;
+                continue;
+            }
+
+            let start_in_chunk = offset.saturating_sub(chunk_start);
+            let take = std::cmp::min(remaining as usize, chunk.len() - start_in_chunk);
+
+            data.extend_from_slice(&chunk[start_in_chunk..start_in_chunk + take]);
+
+            remaining -= take as u64;
+            offset += take;
+            chunk_start = chunk_end;
+
+            if remaining == 0 {
+                break;
+            }
+        }
+
+        Ok(DownloadChunkResponse {
+            data,
+            total_size: file.size,
+        })
     })
 }
 
