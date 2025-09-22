@@ -36,10 +36,9 @@ type LanguageFilter = variant { English; Indonesia };
 type Result = variant { Ok : text; Err : text };
 type Result_1 = variant { Ok; Err : text };
 type Result_2 = variant { Ok : FileArtifact; Err : text };
-type Result_3 = variant { Ok : UploadedFile; Err : text };
-type Result_4 = variant { Ok : DownloadChunkResponse; Err : text };
-type Result_5 = variant { Ok : JobStatus; Err : text };
-type Result_6 = variant { Ok : record { nat64; nat64 }; Err : text };
+type Result_3 = variant { Ok : DownloadChunkResponse; Err : text };
+type Result_4 = variant { Ok : JobStatus; Err : text };
+type Result_5 = variant { Ok : record { nat64; nat64 }; Err : text };
 type SortOrderFilter = variant {
   Oldest;
   AlphabeticalDesc;
@@ -78,16 +77,6 @@ type UploadChunkRequest = record {
   session_id : text;
   data : blob;
 };
-type UploadedFile = record {
-  id : text;
-  owner : principal;
-  data : blob;
-  size : nat64;
-  content_type : text;
-  created_at : nat64;
-  filename : text;
-  deleted_at : opt nat64;
-};
 type UserFileArtifact = record {
   artifact : FileArtifact;
   is_bookmarked : bool;
@@ -95,32 +84,41 @@ type UserFileArtifact = record {
 service : () -> {
   complete_upload : (text) -> (Result);
   delete_file : (text) -> (Result);
+  // Delete a file artifact
   delete_file_artifact : (text) -> (Result_1);
+  // Update a file artifact
   edit_file_artifact : (FileArtifactRequest) -> (Result_2);
-  get_file : (text) -> (Result_3) query;
+  // Query a file artifact with bookmark info for the caller
   get_file_artifact : (text) -> (opt UserFileArtifact) query;
-  get_file_chunk : (DownloadChunkRequest) -> (Result_4) query;
+  get_file_chunk : (DownloadChunkRequest) -> (Result_3) query;
+  // Query a summary result
   get_summary_result : (text) -> (JobStatus) query;
   get_transcription : (text) -> (Result) query;
   get_transcription_result : (text) -> (Result);
-  get_transcription_status : (text) -> (Result_5);
-  get_upload_status : (text) -> (Result_6) query;
+  get_transcription_status : (text) -> (Result_4);
+  get_upload_status : (text) -> (Result_5) query;
   get_user_id : (principal) -> (text) query;
+  // List all bookmarked file artifacts for the current caller
   list_saved_file_artifacts : (opt FileArtifactFilter) -> (
       vec UserFileArtifact,
     ) query;
+  // List all file artifact for the current caller
   list_user_file_artifacts : (opt FileArtifactFilter) -> (
       vec UserFileArtifact,
     ) query;
   login : () -> (text);
   logout : () -> (text);
+  // Search all file artifacts
   search_file_artifacts : (opt FileArtifactFilter) -> (
       vec UserFileArtifact,
     ) query;
+  // Start the summarization process
   start_summarization : (text) -> (Result);
   start_transcription : (text) -> (Result);
   start_upload : (StartUploadRequest) -> (Result);
+  // Bookmark a file artifact
   toggle_file_artifact_bookmark : (text) -> (Result);
+  // Toggle visibility of a file artifact
   toggle_file_artifact_visibility : (text) -> (Result);
   upload_chunk : (UploadChunkRequest) -> (Result);
 }

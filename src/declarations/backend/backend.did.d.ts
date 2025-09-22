@@ -51,13 +51,11 @@ export type Result_1 = { 'Ok' : null } |
   { 'Err' : string };
 export type Result_2 = { 'Ok' : FileArtifact } |
   { 'Err' : string };
-export type Result_3 = { 'Ok' : UploadedFile } |
+export type Result_3 = { 'Ok' : DownloadChunkResponse } |
   { 'Err' : string };
-export type Result_4 = { 'Ok' : DownloadChunkResponse } |
+export type Result_4 = { 'Ok' : JobStatus } |
   { 'Err' : string };
-export type Result_5 = { 'Ok' : JobStatus } |
-  { 'Err' : string };
-export type Result_6 = { 'Ok' : [bigint, bigint] } |
+export type Result_5 = { 'Ok' : [bigint, bigint] } |
   { 'Err' : string };
 export type SortOrderFilter = { 'Oldest' : null } |
   { 'AlphabeticalDesc' : null } |
@@ -95,16 +93,6 @@ export interface UploadChunkRequest {
   'session_id' : string,
   'data' : Uint8Array | number[],
 }
-export interface UploadedFile {
-  'id' : string,
-  'owner' : Principal,
-  'data' : Uint8Array | number[],
-  'size' : bigint,
-  'content_type' : string,
-  'created_at' : bigint,
-  'filename' : string,
-  'deleted_at' : [] | [bigint],
-}
 export interface UserFileArtifact {
   'artifact' : FileArtifact,
   'is_bookmarked' : boolean,
@@ -114,14 +102,13 @@ export interface _SERVICE {
   'delete_file' : ActorMethod<[string], Result>,
   'delete_file_artifact' : ActorMethod<[string], Result_1>,
   'edit_file_artifact' : ActorMethod<[FileArtifactRequest], Result_2>,
-  'get_file' : ActorMethod<[string], Result_3>,
   'get_file_artifact' : ActorMethod<[string], [] | [UserFileArtifact]>,
-  'get_file_chunk' : ActorMethod<[DownloadChunkRequest], Result_4>,
+  'get_file_chunk' : ActorMethod<[DownloadChunkRequest], Result_3>,
   'get_summary_result' : ActorMethod<[string], JobStatus>,
   'get_transcription' : ActorMethod<[string], Result>,
   'get_transcription_result' : ActorMethod<[string], Result>,
-  'get_transcription_status' : ActorMethod<[string], Result_5>,
-  'get_upload_status' : ActorMethod<[string], Result_6>,
+  'get_transcription_status' : ActorMethod<[string], Result_4>,
+  'get_upload_status' : ActorMethod<[string], Result_5>,
   'get_user_id' : ActorMethod<[Principal], string>,
   'list_saved_file_artifacts' : ActorMethod<
     [[] | [FileArtifactFilter]],
