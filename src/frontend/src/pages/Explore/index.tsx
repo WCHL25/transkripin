@@ -14,11 +14,12 @@ import {
    MenuItem,
 } from "@mui/material";
 import {
-   FileArtifact,
    FileArtifactFilter,
+   UserFileArtifact,
 } from "declarations/backend/backend.did";
 import { useEffect, useMemo, useState } from "react";
 import { MdCheck, MdChevronRight, MdSearch } from "react-icons/md";
+import ModalShare from "../Result/components/ModalShare";
 
 const Explore = () => {
    const [anchorTypeEl, setAnchorTypeEl] = useState<null | HTMLElement>(null);
@@ -26,7 +27,10 @@ const Explore = () => {
       null
    );
 
-   const [works, setWorks] = useState<FileArtifact[]>([]);
+   const [openShare, setOpenShare] = useState<boolean>(false);
+   const [selectedWork, setSelectedWork] = useState<number | null>(null);
+
+   const [works, setWorks] = useState<UserFileArtifact[]>([]);
    const [loading, setLoading] = useState(true);
 
    const [searchInput, setSearchInput] = useState("");
@@ -37,9 +41,13 @@ const Explore = () => {
       sort: [{ Newest: null }],
    });
 
-   const debouncedSearch = debounce((q: string) => {
-      setFilter((p) => ({ ...p, search: [q] }));
-   }, 500);
+   const debouncedSearch = useMemo(
+      () =>
+         debounce((q: string) => {
+            setFilter((p) => ({ ...p, search: [q] }));
+         }, 500),
+      []
+   );
 
    const backend = useBackend();
    const setSnackbar = useSnackbarStore((s) => s.setSnackbar);
@@ -84,6 +92,32 @@ const Explore = () => {
       return "no-data";
    };
 
+   const handleToggleBookmark = (fileId: string) => {
+      const idx = works.findIndex((w) => w.artifact.file_id == fileId);
+      works[idx].is_bookmarked = !works[idx].is_bookmarked;
+      setWorks([...works]);
+   };
+
+   const handleToggleVisibility = () => {
+      if (!selectedWork) return;
+
+      const work = works[selectedWork];
+      if (!work) return;
+
+      if ("Public" in work.artifact.visibility) {
+         work.artifact.visibility = { Private: null };
+      } else {
+         work.artifact.visibility = { Public: null };
+      }
+
+      setWorks([...works]);
+   };
+
+   const handleShare = (idx: number) => {
+      setOpenShare(true);
+      setSelectedWork(idx);
+   };
+
    useEffect(() => {
       handleListFileArtifacts();
    }, [filter]);
@@ -96,6 +130,13 @@ const Explore = () => {
          component="main"
          className="px-5 pt-36 pb-20 container mx-auto relative overflow-hidden"
       >
+         <ModalShare
+            open={openShare}
+            onClose={() => setOpenShare(false)}
+            data={selectedWork !== null ? works[selectedWork]?.artifact : null}
+            toggleVisibility={handleToggleVisibility}
+         />
+
          <Box className="flex flex-col gap-8">
             <Box className="flex items-center justify-center gap-2">
                <MdSearch className="text-[52px]" />
@@ -238,8 +279,14 @@ const Explore = () => {
                      onReset={handleResetFilter}
                   />
                ) : (
-                  works.map((w) => (
-                     <WorkCard key={w.file_id} work={w} isExplore />
+                  works.map((w, idx) => (
+                     <WorkCard
+                        key={w.artifact.file_id}
+                        work={w}
+                        isExplore
+                        onToggleBookmark={handleToggleBookmark}
+                        onShare={() => handleShare(idx)}
+                     />
                   ))
                )}
             </Box>

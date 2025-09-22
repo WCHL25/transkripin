@@ -1,5 +1,6 @@
 import {
    Box,
+   CircularProgress,
    debounce,
    IconButton,
    Skeleton,
@@ -8,7 +9,7 @@ import {
    Tooltip,
 } from "@mui/material";
 import { useEffect, useRef, useState, useMemo } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import exampleVideo from "@/assets/video/example.mp4";
 import {
    MdChevronLeft,
@@ -17,15 +18,17 @@ import {
    MdSearch,
    MdShare,
    MdClose,
+   MdBookmark,
+   MdBookmarkBorder,
 } from "react-icons/md";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import ModalDelete from "./components/ModalDelete";
 import ModalShare from "./components/ModalShare";
 import { useBackend } from "@/hooks/useBackend";
-import { FileArtifact } from "declarations/backend/backend.did";
+import { UserFileArtifact } from "declarations/backend/backend.did";
 import { formatRelativeTime, formatTime } from "@/utils/dateUtils";
+import { useAuth } from "@ic-reactor/react";
 
-// Component untuk highlight text
 const HighlightText = ({
    text,
    searchTerm,
@@ -65,14 +68,16 @@ const Result = () => {
    const [selectedTab, setSelectedTab] = useState<"transcript" | "summary">(
       "transcript"
    );
-   const [work, setWork] = useState<FileArtifact | null>(null);
+   const [work, setWork] = useState<UserFileArtifact | null>(null);
    const [openShare, setOpenShare] = useState<boolean>(false);
    const [openDelete, setOpenDelete] = useState<boolean>(false);
    const [isCopied, setIsCopied] = useState(false);
    const [loading, setLoading] = useState(true);
+   const [loadingBookmark, setLoadingBookmark] = useState(false);
    const [showSearch, setShowSearch] = useState(false);
    const [searchTerm, setSearchTerm] = useState("");
 
+   const { identity } = useAuth();
    const location = useLocation();
    const { id } = useParams();
    const setSnackbar = useSnackbarStore((s) => s.setSnackbar);
@@ -92,14 +97,14 @@ const Result = () => {
 
    // Filter transcript segments berdasarkan search
    const filteredSegments = useMemo(() => {
-      if (!work?.transcription[0]?.segments || !searchTerm.trim()) {
-         return work?.transcription[0]?.segments || [];
+      if (!work?.artifact.transcription[0]?.segments || !searchTerm.trim()) {
+         return work?.artifact.transcription[0]?.segments || [];
       }
 
-      return work.transcription[0].segments.filter((segment) =>
+      return work.artifact.transcription[0].segments.filter((segment) =>
          segment.text.toLowerCase().includes(searchTerm.toLowerCase())
       );
-   }, [work?.transcription, searchTerm]);
+   }, [work?.artifact.transcription, searchTerm]);
 
    // Handle search input change
    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -137,10 +142,15 @@ const Result = () => {
    };
 
    const backend = useBackend();
+   const navigate = useNavigate();
 
-   const debounced = debounce(() => {
-      setIsCopied(false);
-   }, 2000);
+   const debounced = useMemo(
+      () =>
+         debounce(() => {
+            setIsCopied(false);
+         }, 2000),
+      []
+   );
 
    const handleCopy = async () => {
       if (!work) return;
@@ -148,8 +158,8 @@ const Result = () => {
       try {
          await navigator.clipboard.writeText(
             selectedTab == "summary"
-               ? work.summary[0]!.text
-               : JSON.stringify(work.transcription[0]!.text)
+               ? work.artifact.summary[0]!.text
+               : JSON.stringify(work.artifact.transcription[0]!.text)
          );
 
          setIsCopied(true);
@@ -176,8 +186,15 @@ const Result = () => {
 
       try {
          const fileArtifact = await backend.get_file_artifact(id!);
-         setWork(fileArtifact[0] || null);
-         console.log(fileArtifact);
+         if (fileArtifact.length) {
+            console.log("fileArtifact", fileArtifact);
+            setWork(fileArtifact[0] || null);
+         } else {
+            setSnackbar({
+               message: "You dont have permission to open this work",
+            });
+            navigate("/saved");
+         }
       } catch (error: any) {
          setSnackbar({ message: error.message });
       }
@@ -185,28 +202,76 @@ const Result = () => {
       setLoading(false);
    };
 
-   const toggleVisibility = () => {
+   const handleToggleVisibility = () => {
       if (!work) return;
 
-      if ("Public" in work.visibility) {
-         work.visibility = { Private: null };
+      if ("Public" in work.artifact.visibility) {
+         work.artifact.visibility = { Private: null };
       } else {
-         work.visibility = { Public: null };
+         work.artifact.visibility = { Public: null };
       }
 
       setWork({ ...work });
    };
 
+   const handleToggleBookmark = async () => {
+      if (!work) return;
+
+      setLoadingBookmark(true);
+      const result = await backend.toggle_file_artifact_bookmark(
+         work.artifact.file_id
+      );
+      setLoadingBookmark(false);
+
+      if ("Err" in result) {
+         setSnackbar({
+            message: result.Err,
+         });
+      }
+
+      if ("Ok" in result) {
+         work.is_bookmarked = !work.is_bookmarked;
+         setWork({ ...work });
+      }
+   };
+
    // const handleGetFile = async () => {
-   //    const file = await backend.get_file(id!);
+   //    const file = await backend.get_file_chunk({
+   //       file_id: id!,
+   //       length: BigInt(0),
+   //       start: BigInt(0),
+   //    });
    //    if ("Ok" in file) {
    //       console.log(file.Ok);
    //    }
    // };
 
+   const debounceUpdateTitle = useMemo(
+      () =>
+         debounce((title: string) => {
+            backend.edit_file_artifact({
+               file_id: work?.artifact.file_id || "",
+               title: [title],
+               summary: [],
+               transcription: [],
+            });
+         }, 800),
+      [work?.artifact.file_id]
+   );
+
+   const handleChangeTitle = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!work) return;
+
+      work.artifact.title = [e.target.value];
+      setWork({
+         ...work,
+      });
+      debounceUpdateTitle(e.target.value);
+   };
+
    useEffect(() => {
       if (!videoUrl) {
-         // handleGetFile()
+         // handleGetFile();
       }
    }, [videoUrl]);
 
@@ -219,18 +284,18 @@ const Result = () => {
          <ModalDelete
             open={openDelete}
             onClose={() => setOpenDelete(false)}
-            data={work}
+            data={work?.artifact || null}
          />
          <ModalShare
             open={openShare}
             onClose={() => setOpenShare(false)}
-            data={work}
-            toggleVisibility={toggleVisibility}
+            data={work?.artifact || null}
+            toggleVisibility={handleToggleVisibility}
          />
 
          <Link
             to={"/saved"}
-            className="flex gap-[2px] items-center text-primary font-bold mb-5 hover:underline"
+            className="flex gap-[2px] items-center text-primary font-bold mb-5 hover:underline w-fit"
          >
             <MdChevronLeft className="text-2xl" />
             Back
@@ -251,17 +316,52 @@ const Result = () => {
                   </>
                ) : (
                   <>
-                     <h1 className="font-bold text-[22px] mb-0.5">
-                        {work?.title}
-                     </h1>
+                     <Box className="mb-0.5 relative">
+                        {work?.artifact.owner.toText() ==
+                           identity?.getPrincipal().toText() && (
+                           <input
+                              type="text"
+                              className="absolute left-0 top-1/2 -translate-y-1/2 focus:outline-none focus:border-b border-background3 font-bold text-[22px] p-0 w-full"
+                              value={work?.artifact.title}
+                              onChange={handleChangeTitle}
+                           />
+                        )}
+                        <h1
+                           className={`font-bold text-[22px] ${
+                              work?.artifact.owner.toText() ==
+                              identity?.getPrincipal().toText()
+                                 ? "invisible whitespace-pre-wrap"
+                                 : ""
+                           }`}
+                        >
+                           {work?.artifact.title}
+                        </h1>
+                     </Box>
                      <p className="font-bold text-foreground2">
-                        {formatRelativeTime(work!.created_at)}
+                        {work
+                           ? formatRelativeTime(work.artifact.created_at)
+                           : "-"}
                      </p>
                   </>
                )}
             </Box>
 
-            <Box className="flex gap-5 items-center">
+            <Box className="flex gap-2 items-center">
+               {work?.artifact.owner.toText() !=
+                  identity?.getPrincipal().toText() && (
+                  <IconButton
+                     onClick={handleToggleBookmark}
+                     disabled={loadingBookmark}
+                  >
+                     {loadingBookmark ? (
+                        <CircularProgress size={20} />
+                     ) : work?.is_bookmarked ? (
+                        <MdBookmark className="text-2xl text-foreground" />
+                     ) : (
+                        <MdBookmarkBorder className="text-2xl text-foreground" />
+                     )}
+                  </IconButton>
+               )}
                <IconButton onClick={() => setOpenShare(true)}>
                   <MdShare className="text-2xl text-foreground" />
                </IconButton>
@@ -273,14 +373,14 @@ const Result = () => {
 
          <Box className="flex gap-5 items-start">
             <Box className="grow basis-0 rounded-lg overflow-hidden sticky top-20 self-start">
-               {work?.content_type.startsWith("video") ? (
+               {work?.artifact.content_type.startsWith("video") ? (
                   <video
                      ref={mediaRef as React.RefObject<HTMLVideoElement>}
                      src={exampleVideo}
                      controls
                      className="w-full rounded-xl"
                   />
-               ) : work?.content_type.startsWith("audio") ? (
+               ) : work?.artifact.content_type.startsWith("audio") ? (
                   <audio
                      controls
                      ref={mediaRef as React.RefObject<HTMLAudioElement>}
@@ -359,7 +459,8 @@ const Result = () => {
                         {selectedTab === "transcript" ? (
                            <span>
                               {filteredSegments.length} of{" "}
-                              {work?.transcription[0]?.segments.length || 0}{" "}
+                              {work?.artifact.transcription[0]?.segments
+                                 .length || 0}{" "}
                               segments match "{searchTerm}"
                            </span>
                         ) : (
@@ -397,7 +498,7 @@ const Result = () => {
                         ) : (
                            <div className="text-sm leading-relaxed">
                               <HighlightText
-                                 text={work?.summary[0]?.text || ""}
+                                 text={work?.artifact.summary[0]?.text || ""}
                                  searchTerm={searchTerm}
                               />
                            </div>
@@ -430,7 +531,8 @@ const Result = () => {
                            : // Show filtered segments if searching, otherwise show all
                              (searchTerm
                                 ? filteredSegments
-                                : work?.transcription[0]?.segments || []
+                                : work?.artifact.transcription[0]?.segments ||
+                                  []
                              ).map((s) => {
                                 const startTime = formatTime(s.start);
 
