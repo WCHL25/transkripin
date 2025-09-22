@@ -6,6 +6,7 @@ use crate::{
         upload::{
             service::check_artifact_visibility,
             domain::entities::{
+                FileChunk,
                 DownloadChunkRequest,
                 DownloadChunkResponse,
                 StartUploadRequest,
@@ -15,6 +16,7 @@ use crate::{
             },
         },
     },
+    FILE_CHUNKS,
     UPLOADED_FILES,
     UPLOAD_SESSIONS,
 };
@@ -57,33 +59,30 @@ pub fn upload_chunk(request: UploadChunkRequest) -> Result<String, String> {
     let caller = ic_cdk::api::caller();
 
     UPLOAD_SESSIONS.with(|sessions| {
-        let mut sessions = sessions.borrow_mut();
-
-        // Remove the session temporarily
-        if let Some(mut session) = sessions.remove(&request.session_id) {
+        let sessions = sessions.borrow_mut();
+        if let Some(mut session) = sessions.get(&request.session_id) {
             if session.owner != caller {
-                // Put it back before returning
-                sessions.insert(request.session_id.clone(), session);
                 return Err("Unauthorized: You don't own this upload session".to_string());
             }
+
             if request.chunk_index >= session.total_chunks {
-                sessions.insert(request.session_id.clone(), session);
                 return Err("Invalid chunk index".to_string());
             }
 
-            let idx = request.chunk_index as usize;
-            if session.uploaded_chunks.len() <= idx {
-                session.uploaded_chunks.resize(session.total_chunks as usize, Vec::new());
-            }
-            if !session.uploaded_chunks[idx].is_empty() {
-                sessions.insert(request.session_id.clone(), session);
-                return Err("Chunk already uploaded".to_string());
-            }
+            // Store the chunk under session ID
+            FILE_CHUNKS.with(|chunks| {
+                let key = FileChunk {
+                    id: session.id.clone(),
+                    chunk_index: request.chunk_index,
+                };
+                chunks.borrow_mut().insert(key, request.data);
+            });
 
-            session.uploaded_chunks[idx] = request.data;
-
-            // Re-insert the modified session
-            sessions.insert(request.session_id.clone(), session);
+            // Track uploaded chunks
+            let chunk_bytes = request.chunk_index.to_le_bytes().to_vec();
+            if !session.uploaded_chunks.contains(&chunk_bytes) {
+                session.uploaded_chunks.push(chunk_bytes);
+            }
 
             Ok("Chunk uploaded successfully".to_string())
         } else {
@@ -95,6 +94,7 @@ pub fn upload_chunk(request: UploadChunkRequest) -> Result<String, String> {
 #[update]
 pub async fn complete_upload(session_id: String) -> Result<String, String> {
     let caller = ic_cdk::api::caller();
+
     let uploaded_file = UPLOAD_SESSIONS.with(|sessions| {
         let mut sessions = sessions.borrow_mut();
         match sessions.remove(&session_id) {
@@ -103,21 +103,14 @@ pub async fn complete_upload(session_id: String) -> Result<String, String> {
                     return Err("Unauthorized: You don't own this upload session".to_string());
                 }
 
-                if session.uploaded_chunks.len() != (session.total_chunks as usize) {
-                    return Err("Not all chunks have been uploaded".to_string());
-                }
-
-                let file_id = generate_id();
-                let created_at = ic_cdk::api::time();
-
                 Ok(UploadedFile {
-                    id: file_id,
+                    id: session.id.clone(),
                     filename: session.filename,
                     content_type: session.content_type,
                     size: session.total_size,
-                    chunks: session.uploaded_chunks,
+                    total_chunks: session.total_chunks,
+                    created_at: session.created_at,
                     owner: caller,
-                    created_at: created_at,
                     deleted_at: None,
                 })
             }
@@ -126,9 +119,8 @@ pub async fn complete_upload(session_id: String) -> Result<String, String> {
     })?;
 
     let file_id = uploaded_file.id.clone();
-    ic_cdk::println!("File Id:{}", file_id);
-
     UPLOADED_FILES.with(|files| files.borrow_mut().insert(file_id.clone(), uploaded_file));
+
     Ok(file_id)
 }
 
@@ -150,6 +142,7 @@ pub fn get_upload_status(session_id: String) -> Result<(u64, u64), String> {
                     .iter()
                     .filter(|c| !c.is_empty())
                     .count() as u64;
+
                 Ok((uploaded_chunks, session.total_chunks))
             }
             None => Err("Upload session not found".to_string()),
@@ -160,42 +153,42 @@ pub fn get_upload_status(session_id: String) -> Result<(u64, u64), String> {
 #[query]
 pub fn get_file_chunk(request: DownloadChunkRequest) -> Result<DownloadChunkResponse, String> {
     let caller = ic_cdk::api::caller();
+
+    // Visibility check
     check_artifact_visibility(&request.file_id, caller)?;
 
-    UPLOADED_FILES.with(|files| {
-        let files = files.borrow();
-        let file = files.get(&request.file_id).ok_or("File not found")?;
+    // Calculate which chunk to fetch
+    let chunk_index = request.start / 1_048_576; // 1MB chunks
+    let offset_in_chunk = (request.start % 1_048_576) as usize;
+    let length = std::cmp::min(request.length as usize, 1_048_576);
 
-        if request.start >= file.size {
-            return Err("Invalid start position".to_string());
-        }
+    let chunk_data = FILE_CHUNKS.with(|chunks| {
+        let key = FileChunk {
+            id: request.file_id.clone(),
+            chunk_index: chunk_index,
+        };
 
-        let mut remaining = request.length as usize;
-        let mut offset = request.start as usize;
-        let mut data = Vec::with_capacity(remaining);
+        chunks
+            .borrow()
+            .get(&key)
+            .ok_or("Chunk not found".to_string())
+            .map(|c| {
+                let end = std::cmp::min(offset_in_chunk + length, c.len());
+                c[offset_in_chunk..end].to_vec()
+            })
+    })?;
 
-        for chunk in &file.chunks {
-            if remaining == 0 {
-                break;
-            }
+    let total_size = UPLOADED_FILES.with(|files| {
+        files
+            .borrow()
+            .get(&request.file_id)
+            .map(|f| f.size)
+            .unwrap_or(0)
+    });
 
-            let chunk_len = chunk.len();
-            if offset >= chunk_len {
-                offset -= chunk_len; // skip this chunk
-                continue;
-            }
-
-            let take = std::cmp::min(remaining, chunk_len - offset);
-            data.extend_from_slice(&chunk[offset..offset + take]);
-
-            remaining -= take;
-            offset = 0; // after first chunk, start from 0 in following chunks
-        }
-
-        Ok(DownloadChunkResponse {
-            data,
-            total_size: file.size,
-        })
+    Ok(DownloadChunkResponse {
+        data: chunk_data,
+        total_size,
     })
 }
 

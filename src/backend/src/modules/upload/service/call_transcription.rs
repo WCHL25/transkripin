@@ -5,18 +5,33 @@ use ic_cdk::api::management_canister::http_request::{
     HttpMethod,
     HttpResponse,
 };
-
 use crate::{
     common::constants::uri::TRANSCRIPTION_URL,
-    modules::{ upload::domain::entities::UploadedFile },
+    modules::upload::domain::entities::FileChunk,
+    FILE_CHUNKS,
+    UPLOADED_FILES,
 };
 
-pub async fn call_transcription(file: UploadedFile) -> Result<String, String> {
+pub async fn call_transcription(file_id: String) -> Result<String, String> {
+    // Load metadata
+    let file = UPLOADED_FILES.with(|files| {
+        files.borrow().get(&file_id).ok_or("File not found".to_string())
+    })?;
+
     let boundary = "----ic_boundary";
     let session_id = file.id.clone();
 
-    // Upload each chunk
-    for (chunk_index, chunk) in file.chunks.iter().enumerate() {
+    for chunk_index in 0..file.total_chunks {
+        let key = FileChunk {
+            id: file.id.clone(),
+            chunk_index: chunk_index,
+        };
+
+        // Fetch chunk from stable storage
+        let chunk = FILE_CHUNKS.with(|chunks| {
+            chunks.borrow().get(&key).ok_or(format!("Chunk {} not found", chunk_index))
+        })?;
+
         // Build multipart body for chunk
         let mut body = Vec::new();
 
@@ -41,7 +56,7 @@ pub async fn call_transcription(file: UploadedFile) -> Result<String, String> {
             ).as_bytes()
         );
         body.extend_from_slice(format!("Content-Type: {}\r\n\r\n", file.content_type).as_bytes());
-        body.extend_from_slice(chunk);
+        body.extend_from_slice(&chunk);
         body.extend_from_slice(b"\r\n");
         body.extend_from_slice(format!("--{}--\r\n", boundary).as_bytes());
 
@@ -75,11 +90,8 @@ pub async fn call_transcription(file: UploadedFile) -> Result<String, String> {
 
     // Tell server we're done uploading
     let finalize_body = serde_json
-        ::to_vec(&serde_json::json!({
-        "session_id": session_id
-    }))
+        ::to_vec(&serde_json::json!({ "session_id": session_id }))
         .unwrap();
-
     let request_size = finalize_body.len() as u64;
     let response_size = 2_000_000u64;
     let cycles = 400_000_000 + (request_size + response_size) * 600_000;
