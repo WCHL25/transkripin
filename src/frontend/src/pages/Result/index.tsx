@@ -495,7 +495,7 @@ const Result = () => {
                            }}
                         />
                      ) : work?.artifact.content_type.startsWith("audio") ? (
-                        <Box className="bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl p-8">
+                        <Box className="rounded-xl p-8">
                            <Box className="flex items-center justify-center mb-4">
                               <Box className="w-16 h-16 bg-white/80 rounded-full flex items-center justify-center">
                                  <span className="text-2xl">🎵</span>
@@ -515,12 +515,12 @@ const Result = () => {
                               Your browser does not support the audio element.
                            </audio>
                            <Box className="text-center mt-4">
-                              <p className="font-medium text-gray-800">
+                              <p className="font-medium text-foreground">
                                  {work?.artifact.title[0] ||
                                     work?.artifact.filename}
                               </p>
                               {totalSize && (
-                                 <p className="text-sm text-gray-600">
+                                 <p className="text-sm text-foreground2">
                                     {formatFileSize(totalSize)}
                                  </p>
                               )}
