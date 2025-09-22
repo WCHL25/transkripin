@@ -41,9 +41,13 @@ const Explore = () => {
       sort: [{ Newest: null }],
    });
 
-   const debouncedSearch = debounce((q: string) => {
-      setFilter((p) => ({ ...p, search: [q] }));
-   }, 500);
+   const debouncedSearch = useMemo(
+      () =>
+         debounce((q: string) => {
+            setFilter((p) => ({ ...p, search: [q] }));
+         }, 500),
+      []
+   );
 
    const backend = useBackend();
    const setSnackbar = useSnackbarStore((s) => s.setSnackbar);

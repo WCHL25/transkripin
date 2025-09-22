@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { MdLink, MdLock, MdOutlineContentCopy, MdPublic } from "react-icons/md";
 import {
    Box,
@@ -28,9 +28,13 @@ const ModalShare = ({ open, onClose, data, toggleVisibility }: Props) => {
 
    const setSnackbar = useSnackbarStore((s) => s.setSnackbar);
 
-   const debounced = debounce(() => {
-      setIsCopied(false);
-   }, 2000);
+   const debounced = useMemo(
+      () =>
+         debounce(() => {
+            setIsCopied(false);
+         }, 2000),
+      []
+   );
 
    const { identity } = useAuth();
    const backend = useBackend();

@@ -57,9 +57,13 @@ const SavedWork = () => {
    const [openShare, setOpenShare] = useState<boolean>(false);
    const [selectedWork, setSelectedWork] = useState<number | null>(null);
 
-   const debouncedSearch = debounce((q: string) => {
-      setFilter((p) => ({ ...p, search: [q] }));
-   }, 500);
+   const debouncedSearch = useMemo(
+      () =>
+         debounce((q: string) => {
+            setFilter((p) => ({ ...p, search: [q] }));
+         }, 500),
+      []
+   );
 
    const [loading, setLoading] = useState(true);
 

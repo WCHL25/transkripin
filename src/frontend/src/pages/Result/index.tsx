@@ -24,6 +24,7 @@ import ModalShare from "./components/ModalShare";
 import { useBackend } from "@/hooks/useBackend";
 import { UserFileArtifact } from "declarations/backend/backend.did";
 import { formatRelativeTime, formatTime } from "@/utils/dateUtils";
+import { useAuth } from "@ic-reactor/react";
 
 const HighlightText = ({
    text,
@@ -72,6 +73,7 @@ const Result = () => {
    const [showSearch, setShowSearch] = useState(false);
    const [searchTerm, setSearchTerm] = useState("");
 
+   const { identity } = useAuth();
    const location = useLocation();
    const { id } = useParams();
    const setSnackbar = useSnackbarStore((s) => s.setSnackbar);
@@ -136,11 +138,15 @@ const Result = () => {
    };
 
    const backend = useBackend();
-   const navigate = useNavigate()
+   const navigate = useNavigate();
 
-   const debounced = debounce(() => {
-      setIsCopied(false);
-   }, 2000);
+   const debounced = useMemo(
+      () =>
+         debounce(() => {
+            setIsCopied(false);
+         }, 2000),
+      []
+   );
 
    const handleCopy = async () => {
       if (!work) return;
@@ -176,11 +182,13 @@ const Result = () => {
 
       try {
          const fileArtifact = await backend.get_file_artifact(id!);
-         if(fileArtifact.length) {
+         if (fileArtifact.length) {
             setWork(fileArtifact[0] || null);
          } else {
-            setSnackbar({ message: "You dont have permission to open this work" });
-            navigate('/saved');
+            setSnackbar({
+               message: "You dont have permission to open this work",
+            });
+            navigate("/saved");
          }
          console.log(fileArtifact);
       } catch (error: any) {
@@ -209,6 +217,29 @@ const Result = () => {
    //    }
    // };
 
+   const debounceUpdateTitle = useMemo(
+      () =>
+         debounce((title: string) => {
+            backend.edit_file_artifact({
+               file_id: work?.artifact.file_id || "",
+               title: [title],
+               summary: [],
+               transcription: [],
+            });
+         }, 800),
+      [work?.artifact.file_id]
+   );
+
+   const handleChangeTitle = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!work) return;
+
+      work.artifact.title = [e.target.value];
+      setWork({
+         ...work,
+      });
+      debounceUpdateTitle(e.target.value);
+   };
+
    useEffect(() => {
       if (!videoUrl) {
          // handleGetFile()
@@ -235,7 +266,7 @@ const Result = () => {
 
          <Link
             to={"/saved"}
-            className="flex gap-[2px] items-center text-primary font-bold mb-5 hover:underline"
+            className="flex gap-[2px] items-center text-primary font-bold mb-5 hover:underline w-fit"
          >
             <MdChevronLeft className="text-2xl" />
             Back
@@ -256,11 +287,31 @@ const Result = () => {
                   </>
                ) : (
                   <>
-                     <h1 className="font-bold text-[22px] mb-0.5">
-                        {work?.artifact.title}
-                     </h1>
+                     <Box className="mb-0.5 relative">
+                        {work?.artifact.owner.toText() ==
+                           identity?.getPrincipal().toText() && (
+                           <input
+                              type="text"
+                              className="absolute left-0 top-1/2 -translate-y-1/2 focus:outline-none focus:border-b border-background3 font-bold text-[22px] p-0 w-full"
+                              value={work?.artifact.title}
+                              onChange={handleChangeTitle}
+                           />
+                        )}
+                        <h1
+                           className={`font-bold text-[22px] ${
+                              work?.artifact.owner.toText() ==
+                              identity?.getPrincipal().toText()
+                                 ? "invisible whitespace-pre-wrap"
+                                 : ""
+                           }`}
+                        >
+                           {work?.artifact.title}
+                        </h1>
+                     </Box>
                      <p className="font-bold text-foreground2">
-                        {work ? formatRelativeTime(work.artifact.created_at) : '-'}
+                        {work
+                           ? formatRelativeTime(work.artifact.created_at)
+                           : "-"}
                      </p>
                   </>
                )}
@@ -364,7 +415,8 @@ const Result = () => {
                         {selectedTab === "transcript" ? (
                            <span>
                               {filteredSegments.length} of{" "}
-                              {work?.artifact.transcription[0]?.segments.length || 0}{" "}
+                              {work?.artifact.transcription[0]?.segments
+                                 .length || 0}{" "}
                               segments match "{searchTerm}"
                            </span>
                         ) : (
@@ -435,7 +487,8 @@ const Result = () => {
                            : // Show filtered segments if searching, otherwise show all
                              (searchTerm
                                 ? filteredSegments
-                                : work?.artifact.transcription[0]?.segments || []
+                                : work?.artifact.transcription[0]?.segments ||
+                                  []
                              ).map((s) => {
                                 const startTime = formatTime(s.start);
 
