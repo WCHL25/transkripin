@@ -93,6 +93,7 @@ export const useChunkedMedia = (
 
             if ("Ok" in response) {
                const responseData = response.Ok;
+               console.log("responseData", responseData);
 
                // Update total size from response if available
                if (responseData.total_size && !totalSize) {

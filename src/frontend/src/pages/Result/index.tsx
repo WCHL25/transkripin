@@ -114,9 +114,9 @@ const Result = () => {
       error: mediaError,
       totalSize,
       loadedSize,
-      loadMedia,
       reset: resetMedia,
       downloadFile,
+      loadCompleteFile,
    } = useChunkedMedia(work?.artifact || null, backend, {
       chunkSize: 1024 * 1024, // 1MB chunks
       preloadChunks: 5, // Load first 5MB
@@ -297,7 +297,7 @@ const Result = () => {
       if (mediaError) {
          resetMedia();
          setTimeout(() => {
-            loadMedia();
+            loadCompleteFile();
          }, 100);
       }
    };
@@ -331,12 +331,7 @@ const Result = () => {
 
    useEffect(() => {
       if (work && !localMediaUrl) {
-         // backend.get_file_chunk({
-         //    file_id: work.artifact.file_id,
-         //    start: BigInt(0),
-         //    length: BigInt(1024),
-         // })
-         loadMedia();
+         loadCompleteFile();
       }
    }, [work, localMediaUrl]);
 
@@ -439,9 +434,9 @@ const Result = () => {
             <Box className="grow basis-0 rounded-lg overflow-hidden sticky top-20 self-start">
                {/* Media Loading State */}
                {isMediaLoading && (
-                  <Box className="relative bg-gray-100 rounded-xl h-64 flex flex-col items-center justify-center">
+                  <Box className="relative bg-background rounded-xl h-64 flex flex-col items-center justify-center">
                      <CircularProgress size={40} className="mb-4" />
-                     <p className="text-sm font-medium text-gray-700 mb-2">
+                     <p className="text-sm font-medium text-gray-400 mb-2">
                         Loading media...
                      </p>
                      <Box className="w-80 bg-gray-200 rounded-full h-2">
@@ -450,7 +445,7 @@ const Result = () => {
                            style={{ width: `${loadingProgress}%` }}
                         />
                      </Box>
-                     <p className="text-xs text-gray-600 mt-2">
+                     <p className="text-xs text-gray-500 mt-2">
                         {loadingProgress.toFixed(1)}%
                         {totalSize && loadedSize && (
                            <span className="ml-2">
@@ -489,30 +484,6 @@ const Result = () => {
                {/* Media Player */}
                {!isMediaLoading && !mediaError && (
                   <Box className="relative">
-                     {/* Media Controls Overlay */}
-                     <Box className="absolute top-2 right-2 z-10 flex gap-1">
-                        <Tooltip title="Download media">
-                           <IconButton
-                              onClick={handleDownloadMedia}
-                              className="bg-black/50 text-white hover:bg-black/70"
-                              size="small"
-                              disabled={!mediaUrl}
-                           >
-                              <MdDownload />
-                           </IconButton>
-                        </Tooltip>
-                        {/* <Tooltip title="Load full quality">
-                           <IconButton
-                              onClick={handleLoadFullQuality}
-                              className="bg-black/50 text-white hover:bg-black/70"
-                              size="small"
-                              disabled={!work?.artifact}
-                           >
-                              <MdHd />
-                           </IconButton>
-                        </Tooltip> */}
-                     </Box>
-
                      {work?.artifact.content_type.startsWith("video") ? (
                         <video
                            ref={mediaRef as React.RefObject<HTMLVideoElement>}
@@ -653,111 +624,115 @@ const Result = () => {
                      </Box>
                   )}
 
-                  {/* Content */}
-                  {selectedTab == "summary" ? (
-                     <Box className="p-5">
-                        {loading ? (
-                           <>
-                              <Skeleton
-                                 variant="text"
-                                 className="text-sm/normal w-full"
-                              />
-                              <Skeleton
-                                 variant="text"
-                                 className="text-sm/normal w-full"
-                              />
-                              <Skeleton
-                                 variant="text"
-                                 className="text-sm/normal w-full"
-                              />
-                              <Skeleton
-                                 variant="text"
-                                 className="text-sm/normal w-full"
-                              />
-                              <Skeleton
-                                 variant="text"
-                                 className="text-sm/normal w-4/5"
-                              />
-                           </>
-                        ) : (
-                           <div className="text-sm leading-relaxed">
-                              <HighlightText
-                                 text={work?.artifact.summary[0]?.text || ""}
-                                 searchTerm={searchTerm}
-                              />
-                           </div>
-                        )}
-                     </Box>
-                  ) : (
-                     <Box className="p-5 flex flex-col gap-6">
-                        {loading
-                           ? Array.from({ length: 6 }).map((_, idx) => (
-                                <Box
-                                   key={idx}
-                                   className="flex gap-4 items-start"
-                                >
-                                   <Skeleton
-                                      variant="text"
-                                      className="text-sm/normal w-12.5"
-                                   />
-                                   <Box className="grow basis-0">
-                                      <Skeleton
-                                         variant="text"
-                                         className="text-sm/normal w-full"
-                                      />
-                                      <Skeleton
-                                         variant="text"
-                                         className="text-sm/normal w-4/5"
-                                      />
-                                   </Box>
-                                </Box>
-                             ))
-                           : // Show filtered segments if searching, otherwise show all
-                             (searchTerm
-                                ? filteredSegments
-                                : work?.artifact.transcription[0]?.segments ||
-                                  []
-                             ).map((s) => {
-                                const startTime = formatTime(s.start);
-
-                                return (
+                  <Box className="max-h-130 overflow-auto">
+                     {/* Content */}
+                     {selectedTab == "summary" ? (
+                        <Box className="p-5">
+                           {loading ? (
+                              <>
+                                 <Skeleton
+                                    variant="text"
+                                    className="text-sm/normal w-full"
+                                 />
+                                 <Skeleton
+                                    variant="text"
+                                    className="text-sm/normal w-full"
+                                 />
+                                 <Skeleton
+                                    variant="text"
+                                    className="text-sm/normal w-full"
+                                 />
+                                 <Skeleton
+                                    variant="text"
+                                    className="text-sm/normal w-full"
+                                 />
+                                 <Skeleton
+                                    variant="text"
+                                    className="text-sm/normal w-4/5"
+                                 />
+                              </>
+                           ) : (
+                              <div className="text-sm leading-relaxed">
+                                 <HighlightText
+                                    text={work?.artifact.summary[0]?.text || ""}
+                                    searchTerm={searchTerm}
+                                 />
+                              </div>
+                           )}
+                        </Box>
+                     ) : (
+                        <Box className="p-5 flex flex-col gap-6">
+                           {loading
+                              ? Array.from({ length: 6 }).map((_, idx) => (
                                    <Box
-                                      key={s.id}
+                                      key={idx}
                                       className="flex gap-4 items-start"
                                    >
-                                      <Tooltip title={`Jump to ${startTime}`}>
-                                         <button
-                                            className="text-primary hover:underline cursor-pointer p-0 min-w-[50px] text-left"
-                                            onClick={() =>
-                                               handleSeekTo(s.start)
-                                            }
-                                         >
-                                            {startTime}
-                                         </button>
-                                      </Tooltip>
-                                      <p className="flex-1 text-sm leading-relaxed">
-                                         <HighlightText
-                                            text={s.text}
-                                            searchTerm={searchTerm}
+                                      <Skeleton
+                                         variant="text"
+                                         className="text-sm/normal w-12.5"
+                                      />
+                                      <Box className="grow basis-0">
+                                         <Skeleton
+                                            variant="text"
+                                            className="text-sm/normal w-full"
                                          />
-                                      </p>
+                                         <Skeleton
+                                            variant="text"
+                                            className="text-sm/normal w-4/5"
+                                         />
+                                      </Box>
                                    </Box>
-                                );
-                             })}
+                                ))
+                              : // Show filtered segments if searching, otherwise show all
+                                (searchTerm
+                                   ? filteredSegments
+                                   : work?.artifact.transcription[0]
+                                        ?.segments || []
+                                ).map((s) => {
+                                   const startTime = formatTime(s.start);
 
-                        {/* No results message */}
-                        {searchTerm &&
-                           filteredSegments.length === 0 &&
-                           !loading && (
-                              <Box className="text-center py-8 text-foreground2">
-                                 <p>
-                                    No transcript segments found for "
-                                    {searchTerm}"
-                                 </p>
-                              </Box>
-                           )}
-                     </Box>
-                  )}
+                                   return (
+                                      <Box
+                                         key={s.id}
+                                         className="flex gap-4 items-start"
+                                      >
+                                         <Tooltip
+                                            title={`Jump to ${startTime}`}
+                                         >
+                                            <button
+                                               className="text-primary hover:underline cursor-pointer p-0 min-w-[50px] text-left"
+                                               onClick={() =>
+                                                  handleSeekTo(s.start)
+                                               }
+                                            >
+                                               {startTime}
+                                            </button>
+                                         </Tooltip>
+                                         <p className="flex-1 text-sm leading-relaxed">
+                                            <HighlightText
+                                               text={s.text}
+                                               searchTerm={searchTerm}
+                                            />
+                                         </p>
+                                      </Box>
+                                   );
+                                })}
+
+                           {/* No results message */}
+                           {searchTerm &&
+                              filteredSegments.length === 0 &&
+                              !loading && (
+                                 <Box className="text-center py-8 text-foreground2">
+                                    <p>
+                                       No transcript segments found for "
+                                       {searchTerm}"
+                                    </p>
+                                 </Box>
+                              )}
+                        </Box>
+                     )}
+                  </Box>
                </Box>
             </Box>
          </Box>
