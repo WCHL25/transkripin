@@ -99,7 +99,7 @@ const Explore = () => {
    };
 
    const handleToggleVisibility = () => {
-      if (!selectedWork) return;
+      if (selectedWork === null) return;
 
       const work = works[selectedWork];
       if (!work) return;
