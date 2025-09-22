@@ -13,11 +13,12 @@ use crate::{
 /* Transcription */
 #[update]
 pub async fn start_transcription(file_id: String) -> Result<String, String> {
-    let file = UPLOADED_FILES.with(|files|
-        files.borrow().get(&file_id).ok_or("File not found".to_string())
-    )?;
-    let job_id = call_transcription(file).await?;
+    UPLOADED_FILES.with(|files| files.borrow().get(&file_id).ok_or("File not found".to_string()))?;
+
+    let job_id = call_transcription(file_id.clone()).await?;
+
     JOBS.with(|jobs| jobs.borrow_mut().insert(job_id.clone(), file_id));
+
     Ok(job_id)
 }
 

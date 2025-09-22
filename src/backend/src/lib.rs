@@ -68,6 +68,13 @@ thread_local! {
         StableBTreeMap::init(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_FILE_ARTIFACTS)))
     );
 
+    static FILE_CHUNKS: RefCell<
+        StableBTreeMap<FileChunk, Vec<u8>, VirtualMemory<DefaultMemoryImpl>>
+    > = RefCell::new({
+        let memory = MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_FILE_CHUNKS));
+        StableBTreeMap::init(memory)
+    });
+
     static USER_BOOKMARKS: RefCell<
         StableBTreeMap<Principal, UserBookmarks, VirtualMemory<DefaultMemoryImpl>>
     > = RefCell::new(

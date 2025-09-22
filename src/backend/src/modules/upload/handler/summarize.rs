@@ -6,6 +6,7 @@ use crate::{
     modules::{
         upload::{
             domain::entities::{
+                FileChunk,
                 FileArtifact,
                 FileArtifactFilter,
                 FileArtifactRequest,
@@ -24,6 +25,7 @@ use crate::{
             },
         },
     },
+    FILE_CHUNKS,
     FILE_ARTIFACTS,
     JOBS,
     SUMMARIES,
@@ -238,6 +240,26 @@ pub fn delete_file_artifact(file_id: String) -> Result<(), String> {
     UPLOADED_FILES.with(|map| {
         map.borrow_mut().remove(&file_id);
     });
+
+    let total_chunks = UPLOADED_FILES.with(|map| {
+        map.borrow_mut()
+            .remove(&file_id)
+            .map(|f| f.total_chunks)
+    });
+
+    if let Some(total_chunks) = total_chunks {
+        // Remove all associated file chunks
+        FILE_CHUNKS.with(|chunks| {
+            let mut chunks = chunks.borrow_mut();
+            for i in 0..total_chunks {
+                let key = FileChunk {
+                    id: file_id.clone(),
+                    chunk_index: i,
+                };
+                chunks.remove(&key);
+            }
+        });
+    }
 
     // (Optional) remove jobs linked to this file
     JOBS.with(|map| {
